@@ -143,6 +143,34 @@ int main(int argc, char **argv) {
     Check(!ok, "non-XML input is rejected gracefully");
   }
 
+  // --- 7b: Edition 1.x axis orders (jcomm.info/ice) ------------------------
+  {
+    // BSH-style v1: EPSG:4326 lat/lon - must NOT be swapped (this was the
+    // "Baltic ice appears over the Persian Gulf" bug)
+    S411Dataset ds;
+    bool ok = LoadS411File(fx + "/v1_latlon.gml", ds, err);
+    Check(ok, "v1 lat/lon dataset loads");
+    bool placed = false, conc = false;
+    for (const auto &f : ds.features) {
+      if (f.latMin > 62 && f.latMax < 65 && f.lonMin > 20 && f.lonMax < 24)
+        placed = true;
+      if (!f.totalConcentration.IsEmpty()) conc = true;
+    }
+    Check(placed, "v1 lat/lon stays in the Baltic (lat 63, lon 22) - not swapped");
+    Check(conc, "v1 iceact concentration parsed");
+
+    // AARI/NWS-style v1: lon/lat with 0..360 longitudes - MUST be swapped and
+    // normalised (303 E -> -57)
+    S411Dataset ds2;
+    ok = LoadS411File(fx + "/v1_lonlat.gml", ds2, err);
+    Check(ok, "v1 lon/lat (0-360) dataset loads");
+    bool placed2 = false;
+    for (const auto &f : ds2.features)
+      if (f.latMin > -65 && f.latMax < -62 && f.lonMin > -58 && f.lonMax < -54)
+        placed2 = true;
+    Check(placed2, "v1 lon/lat detected and normalised (lat -64, lon -56)");
+  }
+
   // --- 8: portrayal - display modes, ice class, palettes ------------------
   {
     // concentration classification (S-411 CONC_CLASS)

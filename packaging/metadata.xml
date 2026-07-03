@@ -1,6 +1,6 @@
 <plugin version="1">
   <name>s411_pi</name>
-  <version>0.3.1</version>
+  <version>0.3.2</version>
   <release>1</release>
   <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
   <api-version>1.16</api-version>

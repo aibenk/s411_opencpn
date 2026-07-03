@@ -115,33 +115,57 @@ static wxString CleanConcV1(wxString v) {
   return "";
 }
 
-// posList/pos text -> coordinate pairs
-static void ParsePosText(const wxString &txt, const ParseCtx &ctx,
-                         std::vector<S411Pos> &out) {
-  std::vector<double> nums;
+static void TokenizeNums(const wxString &txt, std::vector<double> &out) {
   wxStringTokenizer tk(txt, wxT(" \t\r\n,"), wxTOKEN_STRTOK);
   while (tk.HasMoreTokens()) {
     double v;
-    if (tk.GetNextToken().ToCDouble(&v)) nums.push_back(v);
+    if (tk.GetNextToken().ToCDouble(&v)) out.push_back(v);
   }
+}
+
+// posList/pos text -> coordinate pairs, using the file-wide axis decision
+static void ParsePosText(const wxString &txt, const ParseCtx &ctx,
+                         std::vector<S411Pos> &out) {
+  std::vector<double> nums;
+  TokenizeNums(txt, nums);
   if (nums.size() < 2) return;
-  bool swapped = (ctx.axis == Axis::LonLat);
-  if (ctx.axis == Axis::Auto) {
-    for (size_t i = 0; i + 1 < nums.size(); i += 2)
-      if (std::fabs(nums[i]) > 90.0 && std::fabs(nums[i + 1]) <= 90.0) {
-        swapped = true;  // first-of-pair cannot be a latitude
-        break;
-      }
-  }
+  const bool swapped = (ctx.axis == Axis::LonLat);
   for (size_t i = 0; i + 1 < nums.size(); i += 2) {
     double lat = swapped ? nums[i + 1] : nums[i];
     double lon = swapped ? nums[i] : nums[i + 1];
-    if (std::fabs(lat) > 90.0 && std::fabs(lon) <= 90.0)
-      std::swap(lat, lon);  // safety net against a wrong dataset default
     if (lon > 180.0) lon -= 360.0;  // 0..360 producers (AARI, NWS)
     if (std::fabs(lat) <= 90.0 && std::fabs(lon) <= 540.0)
       out.push_back({lat, lon});
   }
+}
+
+// File-wide axis detection (mirrors tools/convert_v1.py): coordinates are
+// lat/lon unless the FIRST value of every pair reaches beyond +/-90 while the
+// SECOND never does - only a longitude can exceed 90, so that means lon/lat.
+// EPSG:4326 mandates lat/lon, but several ice services (AARI, NWS) ship
+// lon/lat with 0..360 longitudes, so the axis must be detected, not assumed.
+static void CollectPosNums(const wxXmlNode *n, std::vector<double> &nums) {
+  for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
+    if (!IsElem(c)) continue;
+    wxString loc = Local(c);
+    if (loc == "posList" || loc == "pos")
+      TokenizeNums(c->GetNodeContent(), nums);
+    else
+      CollectPosNums(c, nums);
+  }
+}
+
+static Axis DetectAxis(const wxXmlNode *root) {
+  std::vector<double> nums;
+  CollectPosNums(root, nums);
+  double maxFirst = 0, maxSecond = 0;
+  for (size_t i = 0; i + 1 < nums.size(); i += 2) {
+    double a = std::fabs(nums[i]), b = std::fabs(nums[i + 1]);
+    if (a > maxFirst) maxFirst = a;
+    if (b > maxSecond) maxSecond = b;
+  }
+  if (maxFirst > 90.0001 && maxSecond <= 90.0001) return Axis::LonLat;
+  return Axis::LatLon;
 }
 
 // keep paths continuous across the antimeridian (done once, at load time)
@@ -291,16 +315,14 @@ static bool ParseDoc(wxXmlDocument &doc, const wxString &source,
     return false;
   }
   ParseCtx ctx;
-  // edition/axis detection from the root namespace declarations
+  // Edition detection from the root namespace: this only picks the attribute
+  // names / feature-code vocabulary (v1 uses iceact/icesod/iceflz and short
+  // feature codes). It does NOT decide the coordinate axis - that is detected
+  // from the data, because both editions occur with either axis order.
   for (wxXmlAttribute *a = root->GetAttributes(); a; a = a->GetNext()) {
-    wxString v = a->GetValue();
-    if (v.Contains("iho.int/S411")) { ctx.axis = Axis::LatLon; break; }
-    if (v.Contains("jcomm.info/ice")) {
-      ctx.axis = Axis::LonLat;
-      ctx.v1 = true;
-      break;
-    }
+    if (a->GetValue().Contains("jcomm.info/ice")) { ctx.v1 = true; break; }
   }
+  ctx.axis = DetectAxis(root);
   out.file = source;
   const wxXmlNode *title = FindDesc(root, "datasetTitle");
   out.title = title ? title->GetNodeContent().Trim().Trim(false)
