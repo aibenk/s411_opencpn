@@ -72,8 +72,9 @@ sudo cp build/libs411_pi.so /usr/lib/opencpn/        # ggf. Pfad anpassen
 
 1. OpenCPN starten (`opencpn`).
 2. *Options → Plugins* → **S-411 Ice** ankreuzen → *OK*.
-3. In der Werkzeugleiste erscheint der **411**-Button. Ein Klick öffnet den
-   **Steuerdialog** (wie das linke Panel im Web-Viewer):
+3. In der Werkzeugleiste erscheint der **411**-Button. Ein Klick öffnet nur den
+   **Steuerdialog** (es wird **nichts automatisch geladen**) — wie das linke
+   Panel im Web-Viewer:
    - **Show ice overlay** – ein/aus (Daten bleiben geladen)
    - **Load data… / Clear** – Datensätze hinzufügen / entfernen
    - **Display mode** – *Ice concentration* / *Stage of development* /
@@ -163,7 +164,16 @@ dist\s411_pi-<version>-msvc-wx32-win32.tar.gz
 
 **Installation über den Plugin-Manager:** OpenCPN → *Options → Plugins* →
 **Import plugin…** → das `.tar.gz` aus `dist\` wählen → Plugin **S-411 Ice**
-in der Liste aktivieren. Deinstallation/Update ebenfalls über den Manager.
+in der Liste aktivieren.
+
+**Deinstallation:** OpenCPN → *Options → Plugins* → **S-411 Ice** anklicken →
+**Uninstall**. Das Plugin lädt von sich aus nie Daten (auch nicht beim Start);
+Deaktivieren oder Deinstallieren entfernt das Overlay sofort und gibt allen
+Speicher frei. Falls einmal Reste bleiben (z.B. die DLL war gesperrt, weil
+OpenCPN lief): OpenCPN schließen und
+`powershell -ExecutionPolicy Bypass -File packaging\uninstall.ps1` ausführen —
+das entfernt DLL und die Registrierung sauber. **Vor dem Import einer neuen
+Version** die alte so deinstallieren.
 
 Alternativ kopiert `buildwin.ps1 -Install` die DLL direkt nach
 `C:\Program Files (x86)\OpenCPN\plugins\` (UAC) — dann aber **nicht beides**:

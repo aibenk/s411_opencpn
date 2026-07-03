@@ -287,10 +287,9 @@ void s411_pi::ShowControl() {
 
 void s411_pi::OnToolbarToolCallback(int id) {
   if (id != m_toolId) return;
-  // first use with no data: go straight to the file picker
-  if (m_data.empty()) LoadFiles();
+  // Never load anything automatically - just open the control panel.
+  // Data is loaded only when the user clicks "Load data..." there.
   ShowControl();
-  Refresh();
 }
 
 void s411_pi::ShowPreferencesDialog(wxWindow *parent) { ShowControl(); }
