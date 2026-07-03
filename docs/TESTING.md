@@ -68,11 +68,22 @@ sudo cp build/libs411_pi.so /usr/lib/opencpn/        # ggf. Pfad anpassen
 > Lädt OpenCPN das Plugin nicht (bleibt in der Plugin-Liste unsichtbar),
 > `opencpn` einmal im Terminal starten und die Meldungen lesen.
 
-### 2.3 Aktivieren
+### 2.3 Aktivieren und bedienen
 
 1. OpenCPN starten (`opencpn`).
 2. *Options → Plugins* → **S-411 Ice** ankreuzen → *OK*.
-3. In der Werkzeugleiste erscheint der **411**-Button.
+3. In der Werkzeugleiste erscheint der **411**-Button. Ein Klick öffnet den
+   **Steuerdialog** (wie das linke Panel im Web-Viewer):
+   - **Show ice overlay** – ein/aus (Daten bleiben geladen)
+   - **Load data… / Clear** – Datensätze hinzufügen / entfernen
+   - **Display mode** – *Ice concentration* / *Stage of development* /
+     *Navigational (ice-class traffic light)*
+   - **Vessel ice class** – nur im Navigational-Modus aktiv (No class …
+     IA Super)
+   - **Colour palette** – *Day* / *Dusk* / *Night*
+   Modus, Eisklasse und Palette werden gespeichert und beim nächsten Start
+   wiederhergestellt. Denselben Dialog gibt es unter *Options → Plugins →
+   S-411 Ice → Preferences*.
 
 ### 2.4 Testdaten beschaffen
 
@@ -118,8 +129,12 @@ bleiben erhalten).
 | 10 | Fehlerfall: beliebige Nicht-XML-Datei wählen | Warnhinweis, kein Absturz |
 | 11 | *Options → Display → Advanced → OpenGL* umschalten, Tests 1+4 wiederholen | beide Rendering-Pfade (GL und Nicht-GL) zeigen dasselbe Bild; im Nicht-GL-Modus sind Füllungen ebenfalls halbtransparent |
 | 12 | Geteilter Bildschirm (zweites Chart-Fenster) | Overlay erscheint in beiden Canvases |
+| 13 | Steuerdialog → **Display mode** auf *Stage of development* | Flächen färben nach Entwicklungsstadium (Violett-/Grüntöne) statt Konzentration; Festeis in diesem Modus nach SOD, nicht grau |
+| 14 | **Display mode** *Navigational* + **Vessel ice class** *IA Super* | Ampel: grün=sicher, gelb=Vorsicht, rot=gefährlich; höhere Eisklasse verschiebt die Grenze (mehr grün/gelb). 10/10-Eis bleibt für jede Klasse rot |
+| 15 | **Colour palette** *Dusk* / *Night* durchschalten | Füllungen abgedunkelt; Linien im Night-Modus hell/sichtbar |
+| 16 | Vergleich mit Web-Viewer (Portal → Viewer, gleicher Datensatz, gleicher Modus/Palette/Eisklasse) | identische Portrayal — Plugin und Viewer nutzen dieselbe Logik/Farbtabelle |
 
-**Bekannte Grenzen (v0.2.0, kein Fehler):** keine Pick-Reports beim Klick auf
+**Bekannte Grenzen (v0.3.0, kein Fehler):** keine Pick-Reports beim Klick auf
 Eisflächen, Punkt-Features als generische Dreiecke statt Annex-C-Symbole,
 Linien-Strichmuster sind Näherungen, kein Eisbericht-Textfenster.
 
