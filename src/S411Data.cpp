@@ -9,6 +9,7 @@
 #include "S411Data.h"
 
 #include <wx/filename.h>
+#include <wx/log.h>
 #include <wx/tokenzr.h>
 #include <wx/xml/xml.h>
 
