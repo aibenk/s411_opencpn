@@ -58,6 +58,8 @@ Test data: the S-411 Ed. 2.0.0 project ships eight test datasets (synthetic
 Baltic/Greenland plus real BSH, CIS, NIC, MET Norway, AARI and NWS charts);
 a subset is included here under `tests/fixtures/`.
 
+**Hands-on testing guide: [docs/TESTING.md](docs/TESTING.md)** (WSL/Linux walkthrough, test checklist with expected results, Windows build notes).
+
 ## Tests
 
 ```sh
