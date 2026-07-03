@@ -8,12 +8,11 @@
 
 #include <wx/dcmemory.h>
 #include <wx/filedlg.h>
+#include <wx/filename.h>
 #include <wx/graphics.h>
 #include <wx/msgdlg.h>
 
-#include <array>
 #include <cmath>
-#include <deque>
 
 #include "S411Colors.h"
 
@@ -22,14 +21,8 @@
 #endif
 #ifdef __WXOSX__
 #include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
 #else
 #include <GL/gl.h>
-#include <GL/glu.h>
-#endif
-
-#ifndef APIENTRY
-#define APIENTRY
 #endif
 
 // ---------------------------------------------------------------------------
@@ -52,11 +45,11 @@ wxString s411_pi::GetShortDescription() {
 }
 
 wxString s411_pi::GetLongDescription() {
-  return "Loads S-411 'Ice Information' Edition 2.0.0 GML datasets\n"
-         "(IHO S-100 based ice charts, e.g. from the BSH ice service or\n"
-         "other WMO ice services) and renders them on the chart with the\n"
-         "WMO ice chart colour code: concentration fills, fast ice, ice\n"
-         "edges and limits, point features.";
+  return "Loads S-411 'Ice Information' datasets - Edition 2.0.0 GML,\n"
+         "Edition 1.x GML, complete exchange sets (CATALOG.XML) or .zip\n"
+         "archives - and renders them on the chart with the WMO ice chart\n"
+         "colour code: concentration fills, fast ice, ice edges and\n"
+         "limits, point features.";
 }
 
 void s411_pi::MakeIcon() {
@@ -96,33 +89,44 @@ bool s411_pi::DeInit(void) {
 }
 
 void s411_pi::LoadDialog() {
-  wxFileDialog dlg(GetOCPNCanvasWindow(), "Open S-411 dataset(s)", m_lastDir,
-                   "",
-                   "S-411 GML datasets (*.gml;*.GML;*.xml)|*.gml;*.GML;*.xml|"
-                   "All files|*.*",
-                   wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
+  wxFileDialog dlg(
+      GetOCPNCanvasWindow(), "Open S-411 data", m_lastDir, "",
+      "S-411 data (*.gml;*.xml;*.zip;CATALOG.XML)|"
+      "*.gml;*.GML;*.xml;*.XML;*.zip;*.ZIP|"
+      "All files|*.*",
+      wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
   if (dlg.ShowModal() != wxID_OK) return;
   wxArrayString paths;
   dlg.GetPaths(paths);
   m_lastDir = dlg.GetDirectory();
+
   wxString errors;
-  size_t nfeat = 0;
+  size_t before = m_data.size();
   for (size_t i = 0; i < paths.GetCount(); i++) {
-    S411Dataset ds;
-    wxString err;
-    if (LoadS411File(paths[i], ds, err)) {
-      nfeat += ds.features.size();
-      m_data.push_back(ds);
+    wxFileName fn(paths[i]);
+    wxString ext = fn.GetExt().Lower();
+    if (ext == "zip") {
+      LoadS411Zip(paths[i], m_data, errors);
+    } else if (fn.GetFullName().Upper() == "CATALOG.XML") {
+      LoadS411ExchangeSet(paths[i], m_data, errors);
     } else {
-      errors += err + "\n";
+      S411Dataset ds;
+      wxString err;
+      if (LoadS411File(paths[i], ds, err))
+        m_data.push_back(ds);
+      else
+        errors += err + "\n";
     }
   }
+  size_t nsets = m_data.size() - before, nfeat = 0;
+  for (size_t i = before; i < m_data.size(); i++)
+    nfeat += m_data[i].features.size();
   if (!errors.IsEmpty())
     wxMessageBox(errors, "S-411: some files could not be loaded",
                  wxOK | wxICON_WARNING, GetOCPNCanvasWindow());
-  if (nfeat)
-    wxLogMessage("s411_pi: loaded %zu feature(s) from %zu file(s)",
-                 nfeat, paths.GetCount());
+  if (nsets)
+    wxLogMessage("s411_pi: loaded %zu dataset(s), %zu feature(s)", nsets,
+                 nfeat);
 }
 
 void s411_pi::OnToolbarToolCallback(int id) {
@@ -142,39 +146,47 @@ void s411_pi::OnToolbarToolCallback(int id) {
 }
 
 // ---------------------------------------------------------------------------
-// geometry -> canvas, with antimeridian handling: rings are unwrapped so
-// consecutive points never jump a world, then shifted onto the world copy
-// nearest to the viewport centre (NWS Alaska charts cross 180 degrees)
+// geometry -> canvas. Longitudes are already unwrapped at load time; here a
+// whole ring/point is only shifted onto the world copy nearest the viewport
+// centre so charts crossing the antimeridian render correctly.
 // ---------------------------------------------------------------------------
+static double WorldShift(double lonCentre, double clon) {
+  return 360.0 * std::floor((lonCentre - clon + 180.0) / 360.0);
+}
+
 static void RingToPix(PlugIn_ViewPort *vp, const std::vector<S411Pos> &ring,
                       std::vector<wxPoint> &out) {
   out.clear();
   if (ring.empty()) return;
-  std::vector<double> lon(ring.size());
-  lon[0] = ring[0].lon;
-  double lmin = lon[0], lmax = lon[0];
-  for (size_t i = 1; i < ring.size(); i++) {
-    double l = ring[i].lon;
-    while (l - lon[i - 1] > 180.0) l -= 360.0;
-    while (lon[i - 1] - l > 180.0) l += 360.0;
-    lon[i] = l;
-    if (l < lmin) lmin = l;
-    if (l > lmax) lmax = l;
+  double lmin = ring[0].lon, lmax = ring[0].lon;
+  for (const auto &p : ring) {
+    if (p.lon < lmin) lmin = p.lon;
+    if (p.lon > lmax) lmax = p.lon;
   }
-  const double k =
-      360.0 * std::floor(((lmin + lmax) / 2.0 - vp->clon + 180.0) / 360.0);
+  const double k = WorldShift((lmin + lmax) / 2.0, vp->clon);
   out.reserve(ring.size());
-  for (size_t i = 0; i < ring.size(); i++) {
-    wxPoint p;
-    GetCanvasPixLL(vp, &p, ring[i].lat, lon[i] - k);
-    out.push_back(p);
+  for (const auto &p : ring) {
+    wxPoint px;
+    GetCanvasPixLL(vp, &px, p.lat, p.lon - k);
+    out.push_back(px);
   }
+}
+
+static wxPoint PointToPix(PlugIn_ViewPort *vp, const S411Pos &pos) {
+  wxPoint px;
+  GetCanvasPixLL(vp, &px, pos.lat, pos.lon - WorldShift(pos.lon, vp->clon));
+  return px;
 }
 
 static bool Culled(const S411Feature &f, PlugIn_ViewPort *vp) {
   if (f.latMax < vp->lat_min - 0.5 || f.latMin > vp->lat_max + 0.5)
     return true;
-  return false;  // longitude test is wrap-sensitive; latitude cull suffices
+  const double c = (f.lonMin + f.lonMax) / 2.0;
+  const double half = (f.lonMax - f.lonMin) / 2.0;
+  const double cs = c - WorldShift(c, vp->clon);
+  if (cs + half < vp->lon_min - 0.5 || cs - half > vp->lon_max + 0.5)
+    return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +203,6 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
 #endif
 
   for (const auto &ds : m_data) {
-    // areas first, then lines, points on top
     for (int pass = 0; pass < 3; pass++) {
       for (const auto &f : ds.features) {
         if ((int)f.kind != (pass == 0 ? (int)S411Kind::Area
@@ -237,8 +248,7 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
                           ls.style));
           dc.DrawLines((int)pix.size(), pix.data());
         } else {
-          wxPoint p;
-          GetCanvasPixLL(vp, &p, f.rings[0][0].lat, f.rings[0][0].lon);
+          wxPoint p = PointToPix(vp, f.rings[0][0]);
           dc.SetBrush(*wxBLACK_BRUSH);
           dc.SetPen(wxPen(*wxWHITE, 1));
           wxPoint tri[3] = {wxPoint(p.x, p.y - 6), wxPoint(p.x - 5, p.y + 4),
@@ -255,21 +265,9 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
 }
 
 // ---------------------------------------------------------------------------
-// OpenGL rendering; concave polygons with holes via GLU tessellation
+// OpenGL rendering: areas were triangulated at load time (S411Tess), so per
+// frame this only transforms vertices - no tessellation cost while panning.
 // ---------------------------------------------------------------------------
-typedef void(APIENTRY *GluCb)();
-static std::deque<std::array<GLdouble, 3>> s_tessStore;
-
-static void APIENTRY cbBegin(GLenum mode) { glBegin(mode); }
-static void APIENTRY cbEnd(void) { glEnd(); }
-static void APIENTRY cbVertex(void *data) { glVertex2dv((GLdouble *)data); }
-static void APIENTRY cbCombine(GLdouble coords[3], void *[4], GLfloat[4],
-                               void **out) {
-  s_tessStore.push_back({coords[0], coords[1], 0.0});
-  *out = s_tessStore.back().data();
-}
-static void APIENTRY cbError(GLenum) {}
-
 bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
   if (!m_show || m_data.empty()) return false;
   std::vector<wxPoint> pix;
@@ -280,36 +278,23 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDisable(GL_TEXTURE_2D);
 
-  GLUtesselator *tess = gluNewTess();
-  gluTessCallback(tess, GLU_TESS_BEGIN, (GluCb)cbBegin);
-  gluTessCallback(tess, GLU_TESS_END, (GluCb)cbEnd);
-  gluTessCallback(tess, GLU_TESS_VERTEX, (GluCb)cbVertex);
-  gluTessCallback(tess, GLU_TESS_COMBINE, (GluCb)cbCombine);
-  gluTessCallback(tess, GLU_TESS_ERROR, (GluCb)cbError);
-  gluTessProperty(tess, GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_ODD);
-
   for (const auto &ds : m_data) {
     for (const auto &f : ds.features) {
-      if (f.kind != S411Kind::Area || Culled(f, vp)) continue;
+      if (f.kind != S411Kind::Area || f.tris.empty() || Culled(f, vp))
+        continue;
       bool berg = f.type == "IcebergArea";
       wxColour fill = S411AreaColour(f.totalConcentration, f.fastIce);
       if (berg) glColor4ub(0, 0, 0, 60);
       else glColor4ub(fill.Red(), fill.Green(), fill.Blue(), 170);
 
-      s_tessStore.clear();
-      gluTessBeginPolygon(tess, nullptr);
-      for (const auto &ring : f.rings) {
-        RingToPix(vp, ring, pix);
-        if (pix.size() < 3) continue;
-        gluTessBeginContour(tess);
-        for (const auto &p : pix) {
-          s_tessStore.push_back({(GLdouble)p.x, (GLdouble)p.y, 0.0});
-          gluTessVertex(tess, s_tessStore.back().data(),
-                        s_tessStore.back().data());
-        }
-        gluTessEndContour(tess);
+      const double k = WorldShift((f.lonMin + f.lonMax) / 2.0, vp->clon);
+      glBegin(GL_TRIANGLES);
+      for (const auto &t : f.tris) {
+        wxPoint p;
+        GetCanvasPixLL(vp, &p, t.lat, t.lon - k);
+        glVertex2i(p.x, p.y);
       }
-      gluTessEndPolygon(tess);
+      glEnd();
 
       glColor4ub(0, 0, 0, 120);   // outline
       glLineWidth(1.0f);
@@ -342,8 +327,7 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
     glDisable(GL_LINE_STIPPLE);
     for (const auto &f : ds.features) {
       if (f.kind != S411Kind::Point || Culled(f, vp)) continue;
-      wxPoint p;
-      GetCanvasPixLL(vp, &p, f.rings[0][0].lat, f.rings[0][0].lon);
+      wxPoint p = PointToPix(vp, f.rings[0][0]);
       glColor4ub(0, 0, 0, 255);
       glBegin(GL_TRIANGLES);
       glVertex2i(p.x, p.y - 6);
@@ -352,8 +336,6 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
       glEnd();
     }
   }
-  gluDeleteTess(tess);
-  s_tessStore.clear();
   glPopAttrib();
   return true;
 }

@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- S-411 Edition 2.0.0 test dataset TDS6: textual ice report with reporting
+     stations (German Baltic coast). The report text is the authentic BSH
+     weekly ice report of 2025-02-17 (ftp.bsh.de/outgoing/eisbericht/,
+     2025_02_17_08KW.pdf), abridged. Station codes use the Baltic Sea Ice Code
+     (digits A/S/T/K; value tables per WMO No. 574 and the BSH Eisbericht key).
+     Demonstrates the reportInformation association: ice reports transmitted
+     to shipping as a complement to the ice chart. -->
+<S411:Dataset xmlns:S411="http://www.iho.int/S411/2.0"
+              xmlns:gml="http://www.opengis.net/gml/3.2"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://www.iho.int/S411/2.0 ../../../../../Annex_D_GML_Schema/S411.xsd"
+              gml:id="DS.411DE00EIS250217">
+  <gml:boundedBy>
+    <gml:Envelope srsName="http://www.opengis.net/def/crs/EPSG/0/4326" srsDimension="2">
+      <gml:lowerCorner>53.5 9.3</gml:lowerCorner>
+      <gml:upperCorner>54.9 14.3</gml:upperCorner>
+    </gml:Envelope>
+  </gml:boundedBy>
+  <S411:DatasetIdentificationInformation>
+    <S411:encodingSpecification>S-100 Part 10b</S411:encodingSpecification>
+    <S411:encodingSpecificationEdition>5.2.0</S411:encodingSpecificationEdition>
+    <S411:productIdentifier>S-411</S411:productIdentifier>
+    <S411:productEdition>2.0.0</S411:productEdition>
+    <S411:applicationProfile>iceInformation</S411:applicationProfile>
+    <S411:datasetFileIdentifier>411DE00EIS250217</S411:datasetFileIdentifier>
+    <S411:datasetTitle>Ice report and reporting stations, German Baltic coast, 2025-02-17</S411:datasetTitle>
+    <S411:datasetReferenceDate>2025-02-17</S411:datasetReferenceDate>
+    <S411:datasetLanguage>eng</S411:datasetLanguage>
+    <S411:datasetAbstract>Textual BSH ice report (Wochenbericht) of 2025-02-17 with coded station reports for the German Baltic coast, complementing the ice chart of the same period (TDS4).</S411:datasetAbstract>
+    <S411:datasetTopicCategory>oceans</S411:datasetTopicCategory>
+  </S411:DatasetIdentificationInformation>
+
+  <S411:imember>
+    <S411:IceAnalysisInformation gml:id="IA.1">
+      <S411:analysisDateTime>2025-02-17T12:00:00Z</S411:analysisDateTime>
+      <S411:sourceOfData>04</S411:sourceOfData>
+      <S411:sourceOfData>03</S411:sourceOfData>
+      <S411:analysisMethod>Daily coded reports of the German ice reporting network (Eismeldedienst), compiled by the BSH ice service.</S411:analysisMethod>
+    </S411:IceAnalysisInformation>
+  </S411:imember>
+  <S411:imember>
+    <S411:IceReport gml:id="IR.1">
+      <S411:reportDateTime>2025-02-17T12:00:00Z</S411:reportDateTime>
+      <S411:reportIdentifier>BSH Eisdienst M12, Wochenbericht 08. KW 2025</S411:reportIdentifier>
+      <S411:language>deu</S411:language>
+      <S411:reportText>Wochenbericht über die aktuelle Eislage im Ostseeraum und in polaren Gebieten — Rostock, den 17.02.2025.
+
+Rückblick auf die 07. KW: In der vergangenen Woche hat die Meereisbedeckung im Ostseeraum deutlich zugenommen. Unter dem Einfluss polarer Kaltluft hat sich bis zum Ende der Woche fast im gesamten Ostseeraum in sehr geschützten Gebieten vereinzelt Eis gebildet. Zudem hat das Meereis auf See von der nördlichen Bottensee bis in die Bottenwiek sowie im östlichen Finnischen Meerbusen deutlich zugenommen.
+
+Aktuelle Eislage Ostsee (16./17.02.2025):
+Bottenwiek: In den Schären der nördlichen Bottenwiek kommt 30-70 cm dickes Festeis, im Osten bis Kemi-3 und Oulu-2, vor. Außerhalb des Festeises folgt im Osten 15-35 cm dickes, sehr dichtes Eis und im Westen meist dünnes ebenes Eis. In den südlichen Schären liegt bis 30 cm dickes Festeis. Auf See treibt im Norden bis 60 cm dickes, sehr dichtes, teilweise aufgepresstes oder aufgeschobenes Eis.
+Norra Kvarken: In den inneren Schären bei Vaasa kommt 20-35 cm dickes Festeis bis Ensten vor sowie sehr dichtes bis 30 cm dickes Eis bis zum Leuchtturm Vaasa.
+Bottensee: Entlang der finnischen Küste kommt im Norden bis 20 cm dickes Festeis sowie im Süden dünnes ebenes Eis vor. Weiter außerhalb befindet sich Neueis.
+Finnischer Meerbusen: Entlang der nördlichen Küste kommt in den inneren Schären ebenes oder dünnes Eis vor.
+Deutsche Küste: In sehr geschützten Gebieten der Vorpommerschen Boddengewässer sowie örtlich am Stettiner Haff liegt dünnes Eis; ansonsten sind die deutschen Küstengewässer überwiegend eisfrei. Die Schifffahrt ist nicht behindert.
+
+(Gekürzt; vollständiger Bericht: BSH Eisdienst, www.bsh.de/Eis, ice@bsh.de.)</S411:reportText>
+      <S411:sourceOfData>04</S411:sourceOfData>
+    </S411:IceReport>
+  </S411:imember>
+
+  <S411:member>
+    <S411:DataCoverage gml:id="DC.1">
+      <S411:maximumDisplayScale>100000</S411:maximumDisplayScale>
+      <S411:minimumDisplayScale>2000000</S411:minimumDisplayScale>
+      <S411:geometry>
+        <gml:Polygon gml:id="DC.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>53.5 9.3 53.5 14.3 54.9 14.3 54.9 9.3 53.5 9.3</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:DataCoverage>
+  </S411:member>
+
+  <!-- ===== reporting stations (positions in fairway waters off the station) ===== -->
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.1">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>1</S411:amountAndArrangementCode>
+        <S411:stageOfDevelopmentCode>1</S411:stageOfDevelopmentCode>
+        <S411:topographyCode>0</S411:topographyCode>
+        <S411:navigationConditionsCode>0</S411:navigationConditionsCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>01</S411:totalConcentration>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Flensburg, Innenförde</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>54.807 9.452</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.2">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>0</S411:amountAndArrangementCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>98</S411:totalConcentration>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Kiel, Innenhafen bis Holtenau</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.2.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>54.372 10.157</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.3">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>0</S411:amountAndArrangementCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>98</S411:totalConcentration>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Travemünde, Hafen</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.3.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>53.963 10.872</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.4">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>1</S411:amountAndArrangementCode>
+        <S411:stageOfDevelopmentCode>1</S411:stageOfDevelopmentCode>
+        <S411:topographyCode>0</S411:topographyCode>
+        <S411:navigationConditionsCode>0</S411:navigationConditionsCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>13</S411:totalConcentration>
+      <S411:meanIceThickness>5</S411:meanIceThickness>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Rostock, Unterwarnow</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.4.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>54.115 12.115</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.5">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>2</S411:amountAndArrangementCode>
+        <S411:stageOfDevelopmentCode>1</S411:stageOfDevelopmentCode>
+        <S411:topographyCode>0</S411:topographyCode>
+        <S411:navigationConditionsCode>0</S411:navigationConditionsCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>13</S411:totalConcentration>
+      <S411:meanIceThickness>8</S411:meanIceThickness>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Stralsund, Hafen und Fahrwasser</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.5.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>54.322 13.115</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.6">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>4</S411:amountAndArrangementCode>
+        <S411:stageOfDevelopmentCode>1</S411:stageOfDevelopmentCode>
+        <S411:topographyCode>1</S411:topographyCode>
+        <S411:navigationConditionsCode>1</S411:navigationConditionsCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>78</S411:totalConcentration>
+      <S411:meanIceThickness>12</S411:meanIceThickness>
+      <S411:snowDepth>1</S411:snowDepth>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Greifswalder Bodden</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.6.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>54.215 13.520</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceReportStation gml:id="ST.7">
+      <S411:balticSeaIceCode>
+        <S411:amountAndArrangementCode>5</S411:amountAndArrangementCode>
+        <S411:stageOfDevelopmentCode>2</S411:stageOfDevelopmentCode>
+        <S411:topographyCode>1</S411:topographyCode>
+        <S411:navigationConditionsCode>2</S411:navigationConditionsCode>
+      </S411:balticSeaIceCode>
+      <S411:totalConcentration>91</S411:totalConcentration>
+      <S411:meanIceThickness>15</S411:meanIceThickness>
+      <S411:snowDepth>2</S411:snowDepth>
+      <S411:featureName>
+        <S411:language>deu</S411:language>
+        <S411:name>Kleines Haff (Ueckermünde)</S411:name>
+      </S411:featureName>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:reportInformation ref="IR.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ST.7.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>53.760 14.060</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceReportStation>
+  </S411:member>
+
+</S411:Dataset>

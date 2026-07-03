@@ -12,9 +12,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ libwxgtk3.2-dev libglu1-mesa-dev
       - name: configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DS411_BUILD_TESTS=ON
       - name: build
         run: cmake --build build --parallel
+      - name: run parser tests against real S-411 datasets
+        run: ./build/s411_test tests/fixtures
       - uses: actions/upload-artifact@v4
         with:
           name: libs411_pi-linux

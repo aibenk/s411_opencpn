@@ -1,0 +1,339 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- S-411 Edition 2.0.0 test dataset TDS1: Baltic Sea (Bothnian Bay) ice chart.
+     Producer: DE00 (BSH). Analysis date: 2026-03-01.
+     Attribute codes per WMO/JCOMM Ice Objects Catalogue v5.2 (JCOMM TR-80).
+     Coordinates are latitude longitude (EPSG:4326 axis order). -->
+<S411:Dataset xmlns:S411="http://www.iho.int/S411/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.iho.int/S411/2.0 ../../../../../Annex_D_GML_Schema/S411.xsd" gml:id="DS.411DE00BAL260301">
+  <gml:boundedBy>
+    <gml:Envelope srsName="http://www.opengis.net/def/crs/EPSG/0/4326" srsDimension="2">
+      <gml:lowerCorner>60.0 17.0</gml:lowerCorner>
+      <gml:upperCorner>65.9 25.5</gml:upperCorner>
+    </gml:Envelope>
+  </gml:boundedBy>
+  <S411:DatasetIdentificationInformation>
+    <S411:encodingSpecification>S-100 Part 10b</S411:encodingSpecification>
+    <S411:encodingSpecificationEdition>5.2.0</S411:encodingSpecificationEdition>
+    <S411:productIdentifier>S-411</S411:productIdentifier>
+    <S411:productEdition>2.0.0</S411:productEdition>
+    <S411:applicationProfile>iceInformation</S411:applicationProfile>
+    <S411:datasetFileIdentifier>411DE00BAL260301</S411:datasetFileIdentifier>
+    <S411:datasetTitle>Baltic Sea ice chart, Bothnian Bay, 2026-03-01</S411:datasetTitle>
+    <S411:datasetReferenceDate>2026-03-01</S411:datasetReferenceDate>
+    <S411:datasetLanguage>eng</S411:datasetLanguage>
+    <S411:datasetAbstract>Ice analysis for the Bothnian Bay and northern Bothnian Sea based on SAR imagery and shore observations.</S411:datasetAbstract>
+    <S411:datasetTopicCategory>oceans</S411:datasetTopicCategory>
+    <S411:datasetTopicCategory>climatologyMeteorologyAtmosphere</S411:datasetTopicCategory>
+  </S411:DatasetIdentificationInformation>
+
+  <S411:imember>
+    <S411:IceAnalysisInformation gml:id="IA.1">
+      <S411:analysisDateTime>2026-03-01T12:00:00Z</S411:analysisDateTime>
+      <S411:sourceOfData>01</S411:sourceOfData>
+      <S411:sourceOfData>04</S411:sourceOfData>
+      <S411:analysisMethod>Manual analysis of Sentinel-1 SAR imagery combined with shore and ship observations of the Baltic ice services.</S411:analysisMethod>
+    </S411:IceAnalysisInformation>
+  </S411:imember>
+
+  <!-- ===== meta feature: coverage ===== -->
+  <S411:member>
+    <S411:DataCoverage gml:id="DC.1">
+      <S411:maximumDisplayScale>100000</S411:maximumDisplayScale>
+      <S411:minimumDisplayScale>5000000</S411:minimumDisplayScale>
+      <S411:geometry>
+        <gml:Polygon gml:id="DC.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>60.0 17.0 60.0 25.5 65.9 25.5 65.9 17.0 60.0 17.0</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:DataCoverage>
+  </S411:member>
+
+  <!-- ===== fast ice along the northeastern coast (formOfIce 09 = fast ice) ===== -->
+  <S411:member>
+    <S411:SeaIce gml:id="SI.1">
+      <S411:featureObjectIdentifier>
+        <S411:agency>DE</S411:agency>
+        <S411:featureIdentificationNumber>100001</S411:featureIdentificationNumber>
+        <S411:featureIdentificationSubdivision>0</S411:featureIdentificationSubdivision>
+      </S411:featureObjectIdentifier>
+      <S411:totalConcentration>92</S411:totalConcentration>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>92</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>89</S411:stageOfDevelopment>
+          <S411:formOfIce>09</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:levelIceIndication>01</S411:levelIceIndication>
+      <S411:meanIceThickness>65</S411:meanIceThickness>
+      <S411:maximumIceThickness>80</S411:maximumIceThickness>
+      <S411:minimumIceThickness>40</S411:minimumIceThickness>
+      <S411:thicknessType>01</S411:thicknessType>
+      <S411:featureName>
+        <S411:language>eng</S411:language>
+        <S411:name>Bothnian Bay fast ice belt</S411:name>
+      </S411:featureName>
+      <S411:sourceDate>2026-03-01</S411:sourceDate>
+      <S411:sourceIndication>DE,BSH,SAR analysis</S411:sourceIndication>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="SI.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>65.4250 24.6625 65.4750 24.6375 65.5219 24.6000 65.5656 24.5500 65.6063 24.4875 65.6437 24.4125 65.6750 24.3188 65.7000 24.2063 65.7188 24.0750 65.7312 23.9250 65.7312 23.7812 65.7188 23.6437 65.6937 23.5125 65.6562 23.3875 65.6187 23.3125 65.5812 23.2875 65.5438 23.3125 65.5063 23.3875 65.4719 23.4750 65.4406 23.5750 65.4125 23.6875 65.3875 23.8125 65.3688 23.9500 65.3562 24.1000 65.3500 24.2625 65.3500 24.4375 65.3625 24.5625 65.3875 24.6375 65.4250 24.6625</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:SeaIce>
+  </S411:member>
+
+  <!-- ===== very close drift ice, central Bothnian Bay ===== -->
+  <S411:member>
+    <S411:SeaIce gml:id="SI.2">
+      <S411:totalConcentration>91</S411:totalConcentration>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>90</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>91</S411:stageOfDevelopment>
+          <S411:formOfIce>05</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>10</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>83</S411:stageOfDevelopment>
+          <S411:formOfIce>03</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:levelIceIndication>02</S411:levelIceIndication>
+      <S411:icePressure>20</S411:icePressure>
+      <S411:ridgeConcentration>30</S411:ridgeConcentration>
+      <S411:ridgeMeanHeight>8</S411:ridgeMeanHeight>
+      <S411:meanIceThickness>50</S411:meanIceThickness>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="SI.2.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>64.5250 21.7500 64.6750 21.8500 64.8063 21.9750 64.9188 22.1250 65.0125 22.3000 65.0875 22.5000 65.1312 22.7063 65.1438 22.9188 65.1250 23.1375 65.0750 23.3625 65.0062 23.5250 64.9188 23.6250 64.8125 23.6625 64.6875 23.6375 64.5687 23.5688 64.4563 23.4563 64.3500 23.3000 64.2500 23.1000 64.1875 22.8750 64.1625 22.6250 64.1750 22.3500 64.2250 22.0500 64.3000 21.8500 64.4000 21.7500 64.5250 21.7500</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:SeaIce>
+  </S411:member>
+
+  <!-- ===== close drift ice ===== -->
+  <S411:member>
+    <S411:SeaIce gml:id="SI.3">
+      <S411:totalConcentration>70</S411:totalConcentration>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>40</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>87</S411:stageOfDevelopment>
+          <S411:formOfIce>04</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>30</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>84</S411:stageOfDevelopment>
+          <S411:formOfIce>03</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="SI.3.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>63.8250 20.8250 63.9750 20.9750 64.0969 21.1562 64.1906 21.3687 64.2563 21.6125 64.2938 21.8875 64.2938 22.1313 64.2562 22.3438 64.1812 22.5250 64.0687 22.6750 63.9562 22.7437 63.8437 22.7312 63.7312 22.6375 63.6188 22.4625 63.5313 22.2688 63.4688 22.0562 63.4313 21.8250 63.4187 21.5750 63.4219 21.3500 63.4406 21.1500 63.4750 20.9750 63.5250 20.8250 63.6000 20.7500 63.7000 20.7500 63.8250 20.8250</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:SeaIce>
+  </S411:member>
+
+  <!-- ===== very open new ice ===== -->
+  <S411:member>
+    <S411:SeaIce gml:id="SI.4">
+      <S411:totalConcentration>13</S411:totalConcentration>
+      <S411:iceCharacteristic>
+        <S411:partialConcentration>13</S411:partialConcentration>
+        <S411:developmentAndForm>
+          <S411:stageOfDevelopment>81</S411:stageOfDevelopment>
+          <S411:formOfIce>02</S411:formOfIce>
+        </S411:developmentAndForm>
+      </S411:iceCharacteristic>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="SI.4.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>62.7250 19.7625 62.8750 19.9375 63.0000 20.1375 63.1000 20.3625 63.1750 20.6125 63.2250 20.8875 63.2375 21.0750 63.2125 21.1750 63.1500 21.1875 63.0500 21.1125 62.9500 21.0125 62.8500 20.8875 62.7500 20.7375 62.6500 20.5625 62.5750 20.3813 62.5250 20.1938 62.5000 20.0000 62.5000 19.8000 62.5375 19.6937 62.6125 19.6813 62.7250 19.7625</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:SeaIce>
+  </S411:member>
+
+  <!-- ===== open water ===== -->
+  <S411:member>
+    <S411:SeaIce gml:id="SI.5">
+      <S411:totalConcentration>01</S411:totalConcentration>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="SI.5.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>61.3750 18.4250 61.6250 18.5750 61.8375 18.7563 62.0125 18.9688 62.1500 19.2125 62.2500 19.4875 62.2812 19.7375 62.2437 19.9625 62.1375 20.1625 61.9625 20.3375 61.7813 20.4188 61.5938 20.4062 61.4000 20.3000 61.2000 20.1000 61.0375 19.8938 60.9125 19.6813 60.8250 19.4625 60.7750 19.2375 60.7563 19.0250 60.7688 18.8250 60.8125 18.6375 60.8875 18.4625 61.0062 18.3687 61.1688 18.3562 61.3750 18.4250</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:SeaIce>
+  </S411:member>
+
+  <!-- ===== lake ice (coastal lake) ===== -->
+  <S411:member>
+    <S411:LakeIce gml:id="LI.1">
+      <S411:totalConcentration>92</S411:totalConcentration>
+      <S411:lakeIceStageOfDevelopment>04</S411:lakeIceStageOfDevelopment>
+      <S411:meanIceThickness>45</S411:meanIceThickness>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Polygon gml:id="LI.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:exterior>
+            <gml:LinearRing>
+              <gml:posList>63.1875 23.5800 63.2125 23.5800 63.2313 23.5875 63.2437 23.6025 63.2500 23.6250 63.2500 23.6550 63.2437 23.6775 63.2313 23.6925 63.2125 23.7000 63.1875 23.7000 63.1687 23.6925 63.1562 23.6775 63.1500 23.6550 63.1500 23.6250 63.1562 23.6025 63.1687 23.5875 63.1875 23.5800</gml:posList>
+            </gml:LinearRing>
+          </gml:exterior>
+        </gml:Polygon>
+      </S411:geometry>
+    </S411:LakeIce>
+  </S411:member>
+
+  <!-- ===== lines ===== -->
+  <S411:member>
+    <S411:IceEdge gml:id="IE.1">
+      <S411:relativeIceLocation>10</S411:relativeIceLocation>
+      <S411:information>
+        <S411:language>eng</S411:language>
+        <S411:text>Estimated ice edge from SAR mosaic of 2026-03-01 morning passes; ice lies north and west of the line.</S411:text>
+      </S411:information>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:LineString gml:id="IE.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:posList>62.6000 19.6000 62.6250 19.6500 62.6750 19.7500 62.7500 19.9000 62.8500 20.1000 62.9437 20.3187 63.0313 20.5562 63.1125 20.8125 63.1875 21.0875 63.2375 21.3500 63.2625 21.6000 63.2625 21.8375 63.2375 22.0625 63.2188 22.2312 63.2063 22.3437 63.2000 22.4000</gml:posList>
+        </gml:LineString>
+      </S411:geometry>
+    </S411:IceEdge>
+  </S411:member>
+
+  <S411:member>
+    <S411:OpenWaterLimit gml:id="OWL.1">
+      <S411:relativeIceLocation>08</S411:relativeIceLocation>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:LineString gml:id="OWL.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:posList>61.9000 18.6000 61.9250 18.6625 61.9750 18.7875 62.0500 18.9750 62.1500 19.2250 62.2188 19.4875 62.2562 19.7625 62.2625 20.0500 62.2375 20.3500 62.2188 20.5750 62.2063 20.7250 62.2000 20.8000</gml:posList>
+        </gml:LineString>
+      </S411:geometry>
+    </S411:OpenWaterLimit>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceRidgeLine gml:id="IRL.1">
+      <S411:ridgeClassification>01</S411:ridgeClassification>
+      <S411:ridgeMeanHeight>8</S411:ridgeMeanHeight>
+      <S411:ridgeMaximumHeight>15</S411:ridgeMaximumHeight>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:LineString gml:id="IRL.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:posList>64.6000 22.0000 64.6094 22.0375 64.6281 22.1125 64.6562 22.2250 64.6937 22.3750 64.7281 22.5250 64.7594 22.6750 64.7875 22.8250 64.8125 22.9750 64.8312 23.0875 64.8438 23.1625 64.8500 23.2000</gml:posList>
+        </gml:LineString>
+      </S411:geometry>
+    </S411:IceRidgeLine>
+  </S411:member>
+
+  <!-- ===== jammed brash barrier (line feature since IOC v5.2) ===== -->
+  <S411:member>
+    <S411:JammedBrashBarrier gml:id="JB.1">
+      <S411:brashIceConcentration>
+        <S411:veryThickBrashConcentration>01</S411:veryThickBrashConcentration>
+        <S411:thickBrashConcentration>20</S411:thickBrashConcentration>
+        <S411:mediumBrashConcentration>40</S411:mediumBrashConcentration>
+        <S411:thinBrashConcentration>12</S411:thinBrashConcentration>
+      </S411:brashIceConcentration>
+      <S411:iceFeatureWidth>300</S411:iceFeatureWidth>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:LineString gml:id="JB.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:posList>65.3000 23.2000 65.3062 23.2250 65.3187 23.2750 65.3375 23.3500 65.3625 23.4500 65.3844 23.5500 65.4031 23.6500 65.4188 23.7500 65.4313 23.8500 65.4406 23.9250 65.4469 23.9750 65.4500 24.0000</gml:posList>
+        </gml:LineString>
+      </S411:geometry>
+    </S411:JammedBrashBarrier>
+  </S411:member>
+
+  <!-- ===== points ===== -->
+  <S411:member>
+    <S411:IceThickness gml:id="IT.1">
+      <S411:meanIceThickness>70</S411:meanIceThickness>
+      <S411:maximumIceThickness>85</S411:maximumIceThickness>
+      <S411:minimumIceThickness>55</S411:minimumIceThickness>
+      <S411:thicknessType>01</S411:thicknessType>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="IT.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>65.55 23.90</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceThickness>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceThickness gml:id="IT.2">
+      <S411:meanIceThickness>35</S411:meanIceThickness>
+      <S411:thicknessType>02</S411:thicknessType>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="IT.2.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>63.80 21.80</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceThickness>
+  </S411:member>
+
+  <!-- drift towards southwest: IOC v5.2 ICEDDR code 05 -->
+  <S411:member>
+    <S411:IceDrift gml:id="ID.1">
+      <S411:driftSpeed>0.4</S411:driftSpeed>
+      <S411:driftDirection>05</S411:driftDirection>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="ID.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>64.70 22.70</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceDrift>
+  </S411:member>
+
+  <S411:member>
+    <S411:IceCompacting gml:id="IC.1">
+      <S411:convergenceDivergenceRate>20</S411:convergenceDivergenceRate>
+      <S411:icePressure>23</S411:icePressure>
+      <S411:analysisInformation ref="IA.1"/>
+      <S411:geometry>
+        <gml:Point gml:id="IC.1.G" srsName="http://www.opengis.net/def/crs/EPSG/0/4326">
+          <gml:pos>65.25 23.00</gml:pos>
+        </gml:Point>
+      </S411:geometry>
+    </S411:IceCompacting>
+  </S411:member>
+
+</S411:Dataset>

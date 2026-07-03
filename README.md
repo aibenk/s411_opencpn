@@ -18,24 +18,59 @@ The portrayal (colours, line styles, classification rules) is ported verbatim
 from the machine-readable model of the
 [S-411 Edition 2.0.0 specification project](https://github.com/aibenk/s411).
 
+## Exchange sets & supported inputs
+
+The file dialog accepts, in any mix:
+
+| Input | Behaviour |
+|---|---|
+| `*.GML` / `*.gml` | Single S-411 dataset files |
+| `CATALOG.XML` | A complete unpacked S-100 Part 17 exchange set — every dataset below `S100_ROOT` is loaded (robust against producer-specific catalogue quirks) |
+| `*.zip` | An exchange-set archive (e.g. as downloaded from an ice service) — all GML datasets inside are loaded without unpacking |
+
+Both **Edition 2.0.0** (IHO S-100) and legacy **Edition 1.x** datasets
+(`jcomm.info/ice` namespace, as still distributed operationally, e.g. on the
+BSH FTP) are detected automatically, including their different axis order and
+attribute names (`iceact`/`iceflz` → concentration/fast ice).
+
 ## Status
 
-**v0.1.0 — early alpha.** Compiles in CI (Linux); not yet exercised inside a
-running OpenCPN — expect rough edges. Pick reports, egg-code decoding and the
-full Annex C point symbol set are not implemented yet.
+**v0.2.0 — beta.** The parsing/loading pipeline (GML editions, exchange sets,
+zips, antimeridian handling, tessellation) is exercised in CI against **real
+operational datasets** (BSH Baltic chart with 337 features, NWS Alaska chart
+crossing 180°, ice-report stations, a complete exchange set as directory and
+as zip). Rendering inside a running OpenCPN has not had a hands-on pass yet.
+Pick reports, egg-code decoding and the full Annex C point symbol set are not
+implemented yet. Concave ice polygons (with holes) are triangulated once at
+load time, so panning/zooming does not re-tessellate per frame.
 
 ## Usage
 
 1. Install the plugin (see build below), enable **S-411 Ice** in
    *Options → Plugins*.
-2. Click the **411** toolbar button: a file dialog opens — select one or more
-   S-411 GML files (e.g. from `S100_ROOT/S-411/DATASET_FILES/` of an
-   exchange set). *Cancel* keeps previously loaded data.
+2. Click the **411** toolbar button: a file dialog opens — select GML files,
+   a `CATALOG.XML` or a `.zip` (see table above). *Cancel* keeps previously
+   loaded data.
 3. The ice overlay is drawn on the chart. Clicking the button again hides it
    (data is kept); activating it once more lets you add further files.
 
 Test data: the S-411 Ed. 2.0.0 project ships eight test datasets (synthetic
-Baltic/Greenland plus real BSH, CIS, NIC, MET Norway, AARI and NWS charts).
+Baltic/Greenland plus real BSH, CIS, NIC, MET Norway, AARI and NWS charts);
+a subset is included here under `tests/fixtures/`.
+
+## Tests
+
+```sh
+cmake -B build -DS411_BUILD_TESTS=ON
+cmake --build build --parallel
+./build/s411_test tests/fixtures
+```
+
+The test binary is a console app (wx base+xml only, no display needed) and
+validates: feature counts and attributes against the real BSH chart,
+antimeridian unwrap on the NWS Alaska chart, point stations, exchange-set and
+zip loading, graceful rejection of non-XML input, and that the triangle areas
+of the tessellation match the ring areas.
 
 ## Building
 

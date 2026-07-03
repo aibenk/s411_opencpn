@@ -1,19 +1,38 @@
 /***************************************************************************
  * S-411 Ice Information plugin for OpenCPN
- * GML parser: namespace-agnostic (matches on local element names) so that
- * datasets from any producer load regardless of prefix conventions.
+ * GML parser and exchange-set/zip loaders.
+ *
+ * The parser is namespace-agnostic (matches local element names) so that
+ * datasets from any producer load regardless of prefix conventions. The
+ * dataset edition is detected from the root namespace declarations:
+ *   - "iho.int/S411"    -> Edition 2.0.0, axis order lat/lon
+ *   - "jcomm.info/ice"  -> Edition 1.x,   axis order lon/lat, v1 attribute
+ *                          names (iceact/iceflz) and v1 feature codes
  *
  * Copyright (C) 2026 by the s411_pi authors
  * License: GNU General Public License v2 or later (see LICENSE)
  ***************************************************************************/
 #include "S411Data.h"
 
+#include <wx/dir.h>
 #include <wx/filename.h>
 #include <wx/log.h>
 #include <wx/tokenzr.h>
+#include <wx/wfstream.h>
 #include <wx/xml/xml.h>
+#include <wx/zipstrm.h>
 
 #include <cmath>
+#include <memory>
+
+#include "S411Tess.h"
+
+enum class Axis { Auto, LatLon, LonLat };
+
+struct ParseCtx {
+  Axis axis = Axis::Auto;
+  bool v1 = false;
+};
 
 static wxString Local(const wxXmlNode *n) {
   wxString s = n->GetName();
@@ -36,20 +55,61 @@ static const wxXmlNode *FindDesc(const wxXmlNode *n, const wxString &loc) {
   return nullptr;
 }
 
-static bool AnyDescWithText(const wxXmlNode *n, const wxString &loc,
-                            const wxString &value) {
+static bool AnyDescTextContains(const wxXmlNode *n, const wxString &loc,
+                                const wxString &a, const wxString &b) {
   for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
     if (!IsElem(c)) continue;
-    if (Local(c) == loc && c->GetNodeContent().Trim().Trim(false) == value)
-      return true;
-    if (AnyDescWithText(c, loc, value)) return true;
+    if (Local(c) == loc) {
+      wxString t = c->GetNodeContent();
+      if (t.Contains(a) || (!b.IsEmpty() && t.Contains(b))) return true;
+    }
+    if (AnyDescTextContains(c, loc, a, b)) return true;
   }
   return false;
 }
 
-// posList/pos text -> coordinate pairs; S-411 uses EPSG:4326 (lat lon),
-// but some producers ship lon/lat - detected per list and swapped.
-static void ParsePosText(const wxString &txt, std::vector<S411Pos> &out) {
+// Edition 1.x feature codes -> Edition 2.0.0 names (portrayal keys)
+static wxString MapV1Type(const wxString &t) {
+  static const struct { const char *v1, *v2; } M[] = {
+      {"seaice", "SeaIce"}, {"lacice", "LakeIce"}, {"brgare", "IcebergArea"},
+      {"icelne", "IceEdge"}, {"brglne", "IcebergLimit"},
+      {"opnlne", "OpenWaterLimit"}, {"lkilne", "AllKnownIceLimit"},
+      {"i_ridg", "IceRidgeLine"}, {"i_lead", "IceLeadLine"},
+      {"i_fral", "IceFractureLine"}, {"i_crac", "IceCrackLine"},
+      {"jmdbrr", "JammedBrashBarrier"}, {"icecom", "IceCompacting"},
+      {"icelea", "IceLead"}, {"icebrg", "Iceberg"}, {"flobrg", "Floeberg"},
+      {"icethk", "IceThickness"}, {"iceshr", "IceShear"},
+      {"icediv", "IceDivergence"}, {"icerdg", "IceRidgeHummock"},
+      {"icekel", "IceKeelBummock"}, {"icedft", "IceDrift"},
+      {"icefra", "IceFracture"}, {"icerft", "IceRafting"},
+      {"stgmlt", "StageOfMelt"}, {"snwcvr", "SnowCover"},
+      {"strptc", "StripsAndPatches"}, {"i_grhm", "GroundedHummock"},
+  };
+  wxString lt = t.Lower();
+  for (const auto &m : M)
+    if (lt == m.v1) return m.v2;
+  return t;
+}
+
+// Edition 1.x concentration -> IOC v5.2 code (mirrors tools/convert_v1.py)
+static wxString CleanConcV1(wxString v) {
+  v.Trim().Trim(false);
+  v.Replace("[", ""); v.Replace("]", "");
+  if (v.Contains(",")) v = v.BeforeFirst(',').Trim().Trim(false);
+  if (v == "1" || v == "01" || v == "55") return "98";
+  if (v == "2" || v == "02") return "01";
+  if (v == "3" || v == "03") return "02";
+  long n;
+  if (v.ToLong(&n)) {
+    if (n >= 1 && n <= 9) return wxString::Format("%ld", n * 10);
+    if (n >= 10 && n <= 98) return wxString::Format("%02ld", n);
+  }
+  return "";
+}
+
+// posList/pos text -> coordinate pairs
+static void ParsePosText(const wxString &txt, const ParseCtx &ctx,
+                         std::vector<S411Pos> &out) {
   std::vector<double> nums;
   wxStringTokenizer tk(txt, wxT(" \t\r\n,"), wxTOKEN_STRTOK);
   while (tk.HasMoreTokens()) {
@@ -57,51 +117,64 @@ static void ParsePosText(const wxString &txt, std::vector<S411Pos> &out) {
     if (tk.GetNextToken().ToCDouble(&v)) nums.push_back(v);
   }
   if (nums.size() < 2) return;
-  bool swapped = false;
-  for (size_t i = 0; i + 1 < nums.size(); i += 2) {
-    if (std::fabs(nums[i]) > 90.0 && std::fabs(nums[i + 1]) <= 90.0) {
-      swapped = true;  // first-of-pair cannot be a latitude
-      break;
-    }
+  bool swapped = (ctx.axis == Axis::LonLat);
+  if (ctx.axis == Axis::Auto) {
+    for (size_t i = 0; i + 1 < nums.size(); i += 2)
+      if (std::fabs(nums[i]) > 90.0 && std::fabs(nums[i + 1]) <= 90.0) {
+        swapped = true;  // first-of-pair cannot be a latitude
+        break;
+      }
   }
   for (size_t i = 0; i + 1 < nums.size(); i += 2) {
     double lat = swapped ? nums[i + 1] : nums[i];
     double lon = swapped ? nums[i] : nums[i + 1];
+    if (std::fabs(lat) > 90.0 && std::fabs(lon) <= 90.0)
+      std::swap(lat, lon);  // safety net against a wrong dataset default
     if (lon > 180.0) lon -= 360.0;  // 0..360 producers (AARI, NWS)
     if (std::fabs(lat) <= 90.0 && std::fabs(lon) <= 540.0)
       out.push_back({lat, lon});
   }
 }
 
+// keep paths continuous across the antimeridian (done once, at load time)
+static void UnwrapLons(std::vector<S411Pos> &pts) {
+  for (size_t i = 1; i < pts.size(); i++) {
+    while (pts[i].lon - pts[i - 1].lon > 180.0) pts[i].lon -= 360.0;
+    while (pts[i - 1].lon - pts[i].lon > 180.0) pts[i].lon += 360.0;
+  }
+}
+
 // concatenate every posList/pos below n (curve segments etc.)
-static void CollectPositions(const wxXmlNode *n, std::vector<S411Pos> &out) {
+static void CollectPositions(const wxXmlNode *n, const ParseCtx &ctx,
+                             std::vector<S411Pos> &out) {
   for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
     if (!IsElem(c)) continue;
     wxString loc = Local(c);
     if (loc == "posList" || loc == "pos")
-      ParsePosText(c->GetNodeContent(), out);
+      ParsePosText(c->GetNodeContent(), ctx, out);
     else
-      CollectPositions(c, out);
+      CollectPositions(c, ctx, out);
   }
 }
 
 // collect polygon rings: exterior rings first, then interiors (even-odd)
-static void CollectRings(const wxXmlNode *n, bool exterior,
+static void CollectRings(const wxXmlNode *n, const ParseCtx &ctx,
+                         bool exterior,
                          std::vector<std::vector<S411Pos>> &ext,
                          std::vector<std::vector<S411Pos>> &intr) {
   for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
     if (!IsElem(c)) continue;
     wxString loc = Local(c);
     if (loc == "exterior") {
-      CollectRings(c, true, ext, intr);
+      CollectRings(c, ctx, true, ext, intr);
     } else if (loc == "interior") {
-      CollectRings(c, false, ext, intr);
+      CollectRings(c, ctx, false, ext, intr);
     } else if (loc == "LinearRing" || loc == "Ring") {
       std::vector<S411Pos> ring;
-      CollectPositions(c, ring);
+      CollectPositions(c, ctx, ring);
       if (ring.size() >= 3) (exterior ? ext : intr).push_back(ring);
     } else {
-      CollectRings(c, exterior, ext, intr);
+      CollectRings(c, ctx, exterior, ext, intr);
     }
   }
 }
@@ -120,34 +193,55 @@ static const wxXmlNode *FindGeometry(const wxXmlNode *n) {
 }
 
 static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
-                         S411Dataset &ds) {
+                         const ParseCtx &ctx, S411Dataset &ds) {
   S411Feature f;
-  f.type = Local(node);
+  f.type = ctx.v1 ? MapV1Type(Local(node)) : Local(node);
   wxString gloc = Local(geom);
   if (gloc == "Point") {
     std::vector<S411Pos> p;
-    CollectPositions(geom, p);
+    CollectPositions(geom, ctx, p);
     if (p.empty()) return;
     f.kind = S411Kind::Point;
     f.rings.push_back({p[0]});
   } else if (gloc == "LineString" || gloc == "Curve" ||
              gloc == "CompositeCurve") {
     std::vector<S411Pos> line;
-    CollectPositions(geom, line);
+    CollectPositions(geom, ctx, line);
     if (line.size() < 2) return;
+    UnwrapLons(line);
     f.kind = S411Kind::Line;
     f.rings.push_back(line);
   } else {
     std::vector<std::vector<S411Pos>> ext, intr;
-    CollectRings(geom, true, ext, intr);
+    CollectRings(geom, ctx, true, ext, intr);
     if (ext.empty()) return;
     f.kind = S411Kind::Area;
     for (auto &r : ext) f.rings.push_back(r);
     for (auto &r : intr) f.rings.push_back(r);
+    for (auto &r : f.rings) UnwrapLons(r);
+    // keep holes on the same world copy as their exterior
+    if (f.rings.size() > 1) {
+      double ref = f.rings[0][0].lon;
+      for (size_t i = 1; i < f.rings.size(); i++) {
+        double k =
+            360.0 * std::floor((f.rings[i][0].lon - ref + 180.0) / 360.0);
+        if (k != 0.0)
+          for (auto &p : f.rings[i]) p.lon -= k;
+      }
+    }
+    S411Triangulate(f.rings, f.tris);
   }
-  const wxXmlNode *ct = FindDesc(node, "totalConcentration");
-  if (ct) f.totalConcentration = ct->GetNodeContent().Trim().Trim(false);
-  f.fastIce = AnyDescWithText(node, "formOfIce", "09");
+
+  if (ctx.v1) {
+    const wxXmlNode *ct = FindDesc(node, "iceact");
+    if (ct) f.totalConcentration = CleanConcV1(ct->GetNodeContent());
+    f.fastIce = AnyDescTextContains(node, "iceflz", "08", "09");
+  } else {
+    const wxXmlNode *ct = FindDesc(node, "totalConcentration");
+    if (ct) f.totalConcentration = ct->GetNodeContent().Trim().Trim(false);
+    f.fastIce = AnyDescTextContains(node, "formOfIce", "09", "");
+  }
+
   for (const auto &ring : f.rings)
     for (const auto &p : ring) {
       if (p.lat < f.latMin) f.latMin = p.lat;
@@ -159,7 +253,7 @@ static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
 }
 
 // walk the dataset: any element with a gml:id and a geometry is a feature
-static void Walk(const wxXmlNode *n, S411Dataset &ds) {
+static void Walk(const wxXmlNode *n, const ParseCtx &ctx, S411Dataset &ds) {
   for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
     if (!IsElem(c)) continue;
     wxString loc = Local(c);
@@ -169,39 +263,138 @@ static void Walk(const wxXmlNode *n, S411Dataset &ds) {
       const wxXmlNode *geom = FindGeometry(c);
       if (geom) {
         if (loc != "DataCoverage")  // coverage extent is not portrayed
-          ParseFeature(c, geom, ds);
+          ParseFeature(c, geom, ctx, ds);
         continue;  // features are not nested
       }
-      // information types (IceReport, ...) carry no geometry - skip subtree
-      // only if it is clearly an identified object without geometry? They may
-      // still contain nothing renderable; keep walking is harmless.
     }
-    Walk(c, ds);
+    Walk(c, ctx, ds);
   }
+}
+
+static bool ParseDoc(wxXmlDocument &doc, const wxString &source,
+                     S411Dataset &out, wxString &err) {
+  const wxXmlNode *root = doc.GetRoot();
+  if (!root) {
+    err = wxString::Format("%s: empty document", source);
+    return false;
+  }
+  ParseCtx ctx;
+  // edition/axis detection from the root namespace declarations
+  for (wxXmlAttribute *a = root->GetAttributes(); a; a = a->GetNext()) {
+    wxString v = a->GetValue();
+    if (v.Contains("iho.int/S411")) { ctx.axis = Axis::LatLon; break; }
+    if (v.Contains("jcomm.info/ice")) {
+      ctx.axis = Axis::LonLat;
+      ctx.v1 = true;
+      break;
+    }
+  }
+  out.file = source;
+  const wxXmlNode *title = FindDesc(root, "datasetTitle");
+  out.title = title ? title->GetNodeContent().Trim().Trim(false)
+                    : wxFileName(source).GetName();
+  Walk(root, ctx, out);
+  if (out.features.empty()) {
+    err = wxString::Format("%s: no S-411 features with geometry found",
+                           source);
+    return false;
+  }
+  return true;
 }
 
 bool LoadS411File(const wxString &path, S411Dataset &out, wxString &err) {
   wxXmlDocument doc;
   {
-    wxLogNull quiet;  // wxXml reports its own errors; we produce our own
+    wxLogNull quiet;
     if (!doc.Load(path)) {
       err = wxString::Format("%s: not a readable XML/GML file", path);
       return false;
     }
   }
-  out.file = path;
-  const wxXmlNode *root = doc.GetRoot();
-  if (!root) {
-    err = wxString::Format("%s: empty document", path);
-    return false;
+  return ParseDoc(doc, path, out, err);
+}
+
+static bool IsGmlName(const wxString &name) {
+  wxString l = name.Lower();
+  return l.EndsWith(".gml");
+}
+
+size_t LoadS411Zip(const wxString &zipPath, std::vector<S411Dataset> &out,
+                   wxString &errors) {
+  wxFFileInputStream in(zipPath);
+  if (!in.IsOk()) {
+    errors += zipPath + ": cannot open file\n";
+    return 0;
   }
-  const wxXmlNode *title = FindDesc(root, "datasetTitle");
-  out.title = title ? title->GetNodeContent().Trim().Trim(false)
-                    : wxFileName(path).GetName();
-  Walk(root, out);
-  if (out.features.empty()) {
-    err = wxString::Format("%s: no S-411 features with geometry found", path);
-    return false;
+  wxZipInputStream zip(in);
+  size_t loaded = 0;
+  bool sawGml = false;
+  std::unique_ptr<wxZipEntry> entry;
+  while (entry.reset(zip.GetNextEntry()), entry) {
+    if (entry->IsDir() || !IsGmlName(entry->GetName())) continue;
+    sawGml = true;
+    if (!zip.OpenEntry(*entry)) continue;
+    wxXmlDocument doc;
+    bool ok;
+    {
+      wxLogNull quiet;
+      ok = doc.Load(zip);
+    }
+    wxString src = zipPath + "!" + entry->GetName();
+    if (!ok) {
+      errors += src + ": not readable XML\n";
+      continue;
+    }
+    S411Dataset ds;
+    wxString err;
+    if (ParseDoc(doc, src, ds, err)) {
+      out.push_back(ds);
+      loaded++;
+    } else {
+      errors += err + "\n";
+    }
   }
-  return true;
+  if (!sawGml) errors += zipPath + ": no .gml/.GML entries in archive\n";
+  return loaded;
+}
+
+static void FindGmlFiles(const wxString &dir, wxArrayString &out) {
+  wxDir d(dir);
+  if (!d.IsOpened()) return;
+  wxString name;
+  bool more = d.GetFirst(&name, wxEmptyString,
+                         wxDIR_FILES | wxDIR_DIRS | wxDIR_NO_FOLLOW);
+  while (more) {
+    wxString full = dir + wxFileName::GetPathSeparator() + name;
+    if (wxDirExists(full))
+      FindGmlFiles(full, out);
+    else if (IsGmlName(name))
+      out.Add(full);
+    more = d.GetNext(&name);
+  }
+}
+
+size_t LoadS411ExchangeSet(const wxString &catalogPath,
+                           std::vector<S411Dataset> &out, wxString &errors) {
+  // deliberately catalogue-agnostic: producers' CATALOG.XML files differ in
+  // detail, but the dataset files always live below S100_ROOT - scan them.
+  wxString root = wxFileName(catalogPath).GetPath();
+  wxArrayString files;
+  FindGmlFiles(root, files);
+  if (files.IsEmpty()) {
+    errors += root + ": no .gml/.GML dataset files below the catalogue\n";
+    return 0;
+  }
+  size_t loaded = 0;
+  for (size_t i = 0; i < files.GetCount(); i++) {
+    S411Dataset ds;
+    wxString err;
+    if (LoadS411File(files[i], ds, err)) {
+      out.push_back(ds);
+      loaded++;
+    } else {
+      errors += err + "\n";
+    }
+  }
+  return loaded;
 }

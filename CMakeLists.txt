@@ -12,7 +12,8 @@ find_package(OpenGL REQUIRED)
 
 add_library(s411_pi MODULE
   src/s411_pi.cpp
-  src/S411Data.cpp)
+  src/S411Data.cpp
+  src/S411Tess.cpp)
 
 target_include_directories(s411_pi PRIVATE api src)
 target_link_libraries(s411_pi PRIVATE ${wxWidgets_LIBRARIES} OpenGL::GL)
@@ -38,4 +39,28 @@ endif()
 if(APPLE)
   # host symbols (OpenCPN plugin API) are resolved at load time
   set_target_properties(s411_pi PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+endif()
+
+# ---------------------------------------------------------------------------
+# headless parser/loader tests (no GUI, no OpenCPN needed):
+#   cmake -DS411_BUILD_TESTS=ON .. && make && ./s411_test <fixtures-dir>
+# ---------------------------------------------------------------------------
+option(S411_BUILD_TESTS "Build the headless parser tests" OFF)
+if(S411_BUILD_TESTS)
+  # console-only wx (base + xml): the test binary must not require a display
+  find_package(wxWidgets 3.0 REQUIRED COMPONENTS xml base)
+  add_executable(s411_test
+    tests/test_main.cpp
+    src/S411Data.cpp
+    src/S411Tess.cpp)
+  target_include_directories(s411_test PRIVATE src)
+  target_link_libraries(s411_test PRIVATE ${wxWidgets_LIBRARIES})
+  if(TARGET OpenGL::GLU)
+    target_link_libraries(s411_test PRIVATE OpenGL::GLU)
+  else()
+    target_link_libraries(s411_test PRIVATE ${OPENGL_glu_LIBRARY})
+  endif()
+  if(WIN32)
+    target_link_libraries(s411_test PRIVATE glu32 opengl32)
+  endif()
 endif()
