@@ -1,0 +1,9 @@
+build/
+*.o
+*.so
+*.dll
+*.dylib
+.vs/
+.vscode/
+CMakeCache.txt
+CMakeFiles/
