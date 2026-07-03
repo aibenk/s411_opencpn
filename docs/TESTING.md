@@ -131,19 +131,31 @@ Voraussetzungen: Visual Studio 2022 mit C++-Workload, OpenCPN (Windows-Build,
 32-bit) installiert. Dann im Repo:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File buildwin.ps1 -Install
+powershell -ExecutionPolicy Bypass -File buildwin.ps1 -Package
 ```
 
 Das Skript lädt beim ersten Lauf das passende wxWidgets-3.2.9-vc14x-SDK
 (~35 MB), erzeugt die OpenCPN-Importbibliothek **direkt aus der installierten
 `opencpn.exe`** (dumpbin → .def → lib — kein separates SDK nötig), kompiliert
-Win32/`/MD` gegen dieselben wx-DLLs, die OpenCPN mitbringt, und kopiert
-`s411_pi.dll` nach `C:\Program Files (x86)\OpenCPN\plugins\` (UAC-Abfrage).
+Win32/`/MD` gegen dieselben wx-DLLs, die OpenCPN mitbringt, und baut
 
-Danach OpenCPN starten → *Options → Plugins* → **S-411 Ice** aktivieren →
-Checkliste in Abschnitt 3. Nach einem OpenCPN-**Update** das Skript erneut
-laufen lassen (die Importbibliothek muss zur neuen exe passen; dazu vorher
-`sdk\opencpn.lib` löschen).
+```
+dist\s411_pi-<version>-msvc-wx32-win32.tar.gz
+```
+
+— ein Import-Paket im Format des OpenCPN-Plugin-Managers (metadata.xml mit
+`target: msvc-wx32`, DLL unter `plugins/`).
+
+**Installation über den Plugin-Manager:** OpenCPN → *Options → Plugins* →
+**Import plugin…** → das `.tar.gz` aus `dist\` wählen → Plugin **S-411 Ice**
+in der Liste aktivieren. Deinstallation/Update ebenfalls über den Manager.
+
+Alternativ kopiert `buildwin.ps1 -Install` die DLL direkt nach
+`C:\Program Files (x86)\OpenCPN\plugins\` (UAC) — dann aber **nicht beides**:
+entweder Import ODER Direktkopie, sonst wird das Plugin doppelt gefunden.
+
+Nach einem OpenCPN-**Update** `sdk\opencpn.lib` löschen und das Skript neu
+laufen lassen (die Importbibliothek muss zur neuen exe passen).
 
 ---
 

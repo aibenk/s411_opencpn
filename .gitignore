@@ -1,6 +1,7 @@
 build/
 winbuild/
 sdk/
+dist/
 *.o
 *.so
 *.dll

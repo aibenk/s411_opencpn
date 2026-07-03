@@ -4,9 +4,14 @@
 # The script downloads the matching wxWidgets 3.2.9 vc14x SDK on first run
 # and generates the OpenCPN import library from the installed opencpn.exe.
 #
-#   powershell -ExecutionPolicy Bypass -File buildwin.ps1 [-Install]
+#   powershell -ExecutionPolicy Bypass -File buildwin.ps1 [-Install] [-Package]
+#
+#   -Install  copy the DLL into the OpenCPN program plugins folder (UAC)
+#   -Package  build dist\s411_pi-<ver>-msvc-wx32-win32.tar.gz for
+#             OpenCPN's Options -> Plugins -> "Import plugin..." (preferred)
 
-param([switch]$Install)
+param([switch]$Install, [switch]$Package)
+$Version = "0.2.0"
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 $sdk = "$repo\sdk"
@@ -42,7 +47,43 @@ cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /nologo /c /std:c++14 /EHsc /
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 Write-Host "OK: winbuild\s411_pi.dll"
 
-# 4. optional: install (needs elevation)
+# 4. optional: import tarball for the OpenCPN plugin manager
+if ($Package) {
+    New-Item -ItemType Directory -Force "$repo\dist" | Out-Null
+    $py = @"
+import tarfile, io
+VERSION = '$Version'
+META = '''<?xml version="1.0" encoding="UTF-8"?>
+<plugin version="1">
+  <name>s411_pi</name>
+  <version>%s</version>
+  <release>1</release>
+  <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
+  <api-version>1.16</api-version>
+  <open-source>true</open-source>
+  <author>s411_pi authors</author>
+  <source>https://github.com/aibenk/s411_opencpn</source>
+  <description>Loads S-411 Ice Information datasets (Edition 2.0.0/1.x GML,
+exchange sets, zips) and renders them with the WMO ice chart colour code.</description>
+  <target>msvc-wx32</target>
+  <target-version>10</target-version>
+  <target-arch>x86</target-arch>
+  <tarball-url>https://github.com/aibenk/s411_opencpn/releases</tarball-url>
+</plugin>
+''' % VERSION
+top = 's411_pi-%s' % VERSION
+out = r'$repo\dist\s411_pi-%s-msvc-wx32-win32.tar.gz' % VERSION
+with tarfile.open(out, 'w:gz') as t:
+    mb = META.encode()
+    ti = tarfile.TarInfo(top + '/metadata.xml'); ti.size = len(mb)
+    t.addfile(ti, io.BytesIO(mb))
+    t.add(r'$repo\winbuild\s411_pi.dll', arcname=top + '/plugins/s411_pi.dll')
+print('packaged:', out)
+"@
+    python -c $py
+}
+
+# 5. optional: install directly (needs elevation; prefer -Package + import)
 if ($Install) {
     $dst = "$ocpnDir\plugins\s411_pi.dll"
     try { Copy-Item "$repo\winbuild\s411_pi.dll" $dst -Force }
