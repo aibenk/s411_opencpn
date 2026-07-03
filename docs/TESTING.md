@@ -125,26 +125,25 @@ Linien-Strichmuster sind Näherungen, kein Eisbericht-Textfenster.
 
 ---
 
-## 4. Nativer Windows-Build (nur wenn nötig)
+## 4. Nativer Windows-Build (ein Befehl)
 
-OpenCPN für Windows ist ein **32-bit-Build (Win32)** — das Plugin muss
-identisch gebaut werden und braucht die OpenCPN-Importbibliothek:
+Voraussetzungen: Visual Studio 2022 mit C++-Workload, OpenCPN (Windows-Build,
+32-bit) installiert. Dann im Repo:
 
-1. Visual Studio (MSVC) mit C++-Workload installieren.
-2. wxWidgets in **derselben Version/Konfiguration wie OpenCPN** bauen oder
-   das OpenCPN-Plugin-SDK verwenden (liefert `opencpn.lib` + wxWidgets;
-   Bezugsweg siehe [shipdriver-Template](https://github.com/Rasbats/shipdriver_pi)).
-3. Bauen:
-   ```bat
-   cmake -B build -A Win32 -DOCPN_IMPORT_LIB=C:\pfad\zu\opencpn.lib ^
-         -DwxWidgets_ROOT_DIR=C:\pfad\zu\wxWidgets
-   cmake --build build --config Release
-   copy build\Release\s411_pi.dll "%LOCALAPPDATA%\opencpn\plugins\"
-   ```
-4. Weiter wie in 2.3.
+```powershell
+powershell -ExecutionPolicy Bypass -File buildwin.ps1 -Install
+```
 
-Für die erste Praxisrunde ist der WSL-Weg (Abschnitt 2) deutlich schneller
-und testet exakt denselben Code.
+Das Skript lädt beim ersten Lauf das passende wxWidgets-3.2.9-vc14x-SDK
+(~35 MB), erzeugt die OpenCPN-Importbibliothek **direkt aus der installierten
+`opencpn.exe`** (dumpbin → .def → lib — kein separates SDK nötig), kompiliert
+Win32/`/MD` gegen dieselben wx-DLLs, die OpenCPN mitbringt, und kopiert
+`s411_pi.dll` nach `C:\Program Files (x86)\OpenCPN\plugins\` (UAC-Abfrage).
+
+Danach OpenCPN starten → *Options → Plugins* → **S-411 Ice** aktivieren →
+Checkliste in Abschnitt 3. Nach einem OpenCPN-**Update** das Skript erneut
+laufen lassen (die Importbibliothek muss zur neuen exe passen; dazu vorher
+`sdk\opencpn.lib` löschen).
 
 ---
 

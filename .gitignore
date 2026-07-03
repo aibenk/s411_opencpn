@@ -1,4 +1,6 @@
 build/
+winbuild/
+sdk/
 *.o
 *.so
 *.dll
