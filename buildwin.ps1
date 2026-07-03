@@ -47,41 +47,13 @@ cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /nologo /c /std:c++14 /EHsc /
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 Write-Host "OK: winbuild\s411_pi.dll"
 
-# 4. optional: import tarball for the OpenCPN plugin manager
+# 4. optional: import tarball for the OpenCPN plugin manager.
+# Metadata comes from the committed packaging/metadata.xml and the tarball is
+# self-verified - no fragile inline XML generation (that once dropped the
+# quotes around version="1" and broke the import).
 if ($Package) {
-    New-Item -ItemType Directory -Force "$repo\dist" | Out-Null
-    $py = @"
-import tarfile, io
-VERSION = '$Version'
-# NO xml declaration: OpenCPN wraps this file in <plugins>...</plugins>
-# before parsing - a declaration mid-document breaks the import
-META = '''<plugin version="1">
-  <name>s411_pi</name>
-  <version>%s</version>
-  <release>1</release>
-  <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
-  <api-version>1.16</api-version>
-  <open-source>true</open-source>
-  <author>s411_pi authors</author>
-  <source>https://github.com/aibenk/s411_opencpn</source>
-  <description>Loads S-411 Ice Information datasets (Edition 2.0.0/1.x GML,
-exchange sets, zips) and renders them with the WMO ice chart colour code.</description>
-  <target>msvc-wx32</target>
-  <target-version>10</target-version>
-  <target-arch>x86</target-arch>
-  <tarball-url>https://github.com/aibenk/s411_opencpn/releases</tarball-url>
-</plugin>
-''' % VERSION
-top = 's411_pi-%s' % VERSION
-out = r'$repo\dist\s411_pi-%s-msvc-wx32-win32.tar.gz' % VERSION
-with tarfile.open(out, 'w:gz') as t:
-    mb = META.encode()
-    ti = tarfile.TarInfo(top + '/metadata.xml'); ti.size = len(mb)
-    t.addfile(ti, io.BytesIO(mb))
-    t.add(r'$repo\winbuild\s411_pi.dll', arcname=top + '/plugins/s411_pi.dll')
-print('packaged:', out)
-"@
-    python -c $py
+    python "$repo\packaging\pack.py" "$repo\winbuild\s411_pi.dll"
+    if ($LASTEXITCODE -ne 0) { throw "packaging failed" }
 }
 
 # 5. optional: install directly (needs elevation; prefer -Package + import)
