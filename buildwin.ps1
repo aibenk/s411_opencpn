@@ -53,8 +53,9 @@ if ($Package) {
     $py = @"
 import tarfile, io
 VERSION = '$Version'
-META = '''<?xml version="1.0" encoding="UTF-8"?>
-<plugin version="1">
+# NO xml declaration: OpenCPN wraps this file in <plugins>...</plugins>
+# before parsing - a declaration mid-document breaks the import
+META = '''<plugin version="1">
   <name>s411_pi</name>
   <version>%s</version>
   <release>1</release>
