@@ -17,6 +17,7 @@
 #include <cstdio>
 
 #include "S411Data.h"
+#include "S411Portrayal.h"
 
 static int g_fail = 0;
 
@@ -140,6 +141,40 @@ int main(int argc, char **argv) {
     S411Dataset ds;
     bool ok = LoadS411File(fx + "/../test_main.cpp", ds, err);
     Check(!ok, "non-XML input is rejected gracefully");
+  }
+
+  // --- 8: portrayal - display modes, ice class, palettes ------------------
+  {
+    // concentration classification (S-411 CONC_CLASS)
+    Check(S411ConcToken("98") == "ICEFRE", "conc 98 -> ICEFRE (ice free)");
+    Check(S411ConcToken("92") == "ICEC10", "conc 92 -> ICEC10 (10/10)");
+    Check(S411ConcToken("46") == "ICEC46", "conc 46 -> ICEC46 (4-6/10)");
+    Check(S411ConcToken("99") == "ICEUNK", "conc 99 -> ICEUNK (unknown)");
+
+    // fast ice overrides fill except in stage-of-development mode
+    Check(S411AreaTokenFor("91", "95", true, S411Mode::Concentration, "") ==
+              "ICEFST", "fast ice -> ICEFST in concentration mode");
+    Check(S411AreaTokenFor("91", "95", true, S411Mode::StageOfDevelopment,
+                           "") == S411SodToken("95"),
+          "stage-of-development mode ignores fast-ice override");
+
+    // ice-class traffic light: 7/10 (ct 78) is red without a class, but only
+    // amber for an IA Super vessel (amber threshold 10/10)
+    Check(S411NavToken("78", "") == "ICEC46",
+          "nav: 7/10, no class -> caution");
+    Check(S411NavToken("78", "IASuper") == "ICEC13",
+          "nav: 7/10, IA Super -> below limit");
+    Check(S411NavToken("92", "IASuper") == "ICEC9T",
+          "nav: 10/10, IA Super -> hazardous");
+    Check(S411NavToken("98", "IA") == "ICEFRE", "nav: ice free -> safe");
+
+    // palettes dim the fill; night keeps line foreground visible
+    S411Rgb day = S411TokenRgb("ICEC9T", S411Palette::Day);
+    S411Rgb night = S411TokenRgb("ICEC9T", S411Palette::Night);
+    Check(day.r == 255 && day.g == 0, "day ICEC9T = pure red");
+    Check(night.r < day.r, "night palette dims the fill");
+    S411Rgb ln = S411TokenRgb("ICELIN", S411Palette::Night);
+    Check(ln.r > 200, "night ICELIN stays light (visible lines)");
   }
 
   std::printf("\n%s (%d failure%s)\n", g_fail ? "FAILED" : "ALL TESTS PASSED",

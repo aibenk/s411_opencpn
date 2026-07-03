@@ -32,6 +32,7 @@ struct S411Feature {
   std::vector<std::vector<S411Pos>> rings;
   std::vector<S411Pos> tris;                  // pre-tessellated (areas only)
   wxString totalConcentration;                // IOC v5.2 code, may be empty
+  wxString stageOfDevelopment;                // first Sa code, may be empty
   bool fastIce = false;                       // formOfIce 09 (v1: 08/09)
   // bounding box (unwrapped lons) for view culling
   double latMin = 90, latMax = -90, lonMin = 999, lonMax = -999;

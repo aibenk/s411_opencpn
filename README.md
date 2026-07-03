@@ -9,6 +9,10 @@ chart overlay with the WMO ice chart colour code:
 - **Ice lines**: ice edge, iceberg/ice limits, ridges, leads, fractures,
   cracks, jammed brash barriers — with the Annex C dash patterns
 - **Point features** as markers
+- **Switchable display mode** (like the web viewer): ice concentration,
+  stage of development, or navigational **ice-class traffic light**
+  (green/amber/red by vessel ice class IC…IA Super)
+- **Day / Dusk / Night palettes**
 - Antimeridian-safe (NWS Alaska charts crossing 180° render correctly)
 - Namespace-agnostic GML parser: loads S-411 2.0.0 datasets from any
   producer (BSH, CIS, NIC, MET Norway, AARI, NWS); lat/lon axis-order and
@@ -115,7 +119,8 @@ cmake -B build && cmake --build build
 |---|---|
 | `src/s411_pi.*` | Plugin class: toolbar tool, DC + OpenGL overlay rendering (GLU tessellation for concave ice polygons with holes) |
 | `src/S411Data.*` | Namespace-agnostic S-411 GML parser (wxXml, no external deps) |
-| `src/S411Colors.h` | WMO portrayal: concentration classes, line styles |
+| `src/S411Portrayal.h` | WMO portrayal (GUI-free): colour tokens, day/dusk/night palettes, display modes, ice-class traffic light, line styles |
+| `src/S411Tess.*` | Headless GLU polygon triangulation (concave areas with holes) |
 | `api/ocpn_plugin.h` | OpenCPN plugin API header (vendored from OpenCPN master) |
 
 ## License

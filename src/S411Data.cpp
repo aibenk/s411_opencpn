@@ -91,14 +91,22 @@ static wxString MapV1Type(const wxString &t) {
   return t;
 }
 
-// Edition 1.x concentration -> IOC v5.2 code (mirrors tools/convert_v1.py)
-static wxString CleanConcV1(wxString v) {
+// first value of a possibly list-valued v1 attribute: "[95, 87]" -> "95"
+static wxString FirstListValue(wxString v) {
   v.Trim().Trim(false);
   v.Replace("[", ""); v.Replace("]", "");
-  if (v.Contains(",")) v = v.BeforeFirst(',').Trim().Trim(false);
-  if (v == "1" || v == "01" || v == "55") return "98";
-  if (v == "2" || v == "02") return "01";
-  if (v == "3" || v == "03") return "02";
+  if (v.Contains(",")) v = v.BeforeFirst(',');
+  v.Trim().Trim(false);
+  if (v.length() == 1 && wxIsdigit(v[0])) v = "0" + v;
+  return v;
+}
+
+// Edition 1.x concentration -> IOC v5.2 code (mirrors tools/convert_v1.py)
+static wxString CleanConcV1(wxString v) {
+  v = FirstListValue(v);
+  if (v == "01" || v == "55") return "98";
+  if (v == "02") return "01";
+  if (v == "03") return "02";
   long n;
   if (v.ToLong(&n)) {
     if (n >= 1 && n <= 9) return wxString::Format("%ld", n * 10);
@@ -235,10 +243,14 @@ static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
   if (ctx.v1) {
     const wxXmlNode *ct = FindDesc(node, "iceact");
     if (ct) f.totalConcentration = CleanConcV1(ct->GetNodeContent());
+    const wxXmlNode *sod = FindDesc(node, "icesod");
+    if (sod) f.stageOfDevelopment = FirstListValue(sod->GetNodeContent());
     f.fastIce = AnyDescTextContains(node, "iceflz", "08", "09");
   } else {
     const wxXmlNode *ct = FindDesc(node, "totalConcentration");
     if (ct) f.totalConcentration = ct->GetNodeContent().Trim().Trim(false);
+    const wxXmlNode *sod = FindDesc(node, "stageOfDevelopment");
+    if (sod) f.stageOfDevelopment = sod->GetNodeContent().Trim().Trim(false);
     f.fastIce = AnyDescTextContains(node, "formOfIce", "09", "");
   }
 

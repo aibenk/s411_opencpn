@@ -1,0 +1,155 @@
+/***************************************************************************
+ * S-411 Ice Information plugin for OpenCPN
+ * Portrayal logic, ported verbatim from the S-411 Edition 2.0.0
+ * single-source model (Annex C): colour tokens, day/dusk/night palettes,
+ * display modes (concentration / stage of development / ice-class
+ * traffic light) and line styles.
+ *
+ * Deliberately GUI-free (wxString only) so the classification and palette
+ * code can be exercised by the headless test binary.
+ *
+ * Copyright (C) 2026 by the s411_pi authors
+ * License: GNU General Public License v2 or later (see LICENSE)
+ ***************************************************************************/
+#pragma once
+
+#include <wx/string.h>
+
+struct S411Rgb {
+  unsigned char r, g, b;
+};
+
+enum class S411Palette { Day, Dusk, Night };
+enum class S411Mode { Concentration, StageOfDevelopment, Navigational };
+
+// day colours per token (S-411 COLOR_TOKENS); dusk = x0.5, night = x0.2,
+// except ICELIN which stays visible at night (230,230,230)
+inline S411Rgb S411TokenRgb(const wxString &token, S411Palette pal) {
+  struct Tok { const char *name; unsigned char r, g, b; };
+  static const Tok T[] = {
+      {"ICEFRE", 0, 100, 255},   {"ICEOPW", 150, 200, 255},
+      {"ICEC13", 140, 255, 160}, {"ICEC46", 255, 255, 0},
+      {"ICEC79", 255, 125, 7},   {"ICEC9T", 255, 0, 0},
+      {"ICEC10", 145, 0, 0},     {"ICEFST", 150, 150, 150},
+      {"ICEUNK", 228, 228, 228}, {"ICES81", 240, 210, 250},
+      {"ICES82", 255, 100, 255}, {"ICES83", 170, 40, 240},
+      {"ICES84", 135, 60, 215},  {"ICES85", 220, 80, 235},
+      {"ICES86", 255, 255, 0},   {"ICES87", 155, 210, 0},
+      {"ICES88", 215, 250, 130}, {"ICES89", 175, 250, 0},
+      {"ICES91", 0, 200, 20},    {"ICES93", 0, 120, 0},
+      {"ICES94", 0, 120, 0},     {"ICES95", 180, 100, 50},
+      {"ICES96", 255, 120, 10},  {"ICES97", 200, 0, 0},
+      {"ICELIN", 0, 0, 0},       {"ICEBRG", 0, 0, 0},
+  };
+  S411Rgb rgb = {228, 228, 228};  // ICEUNK fallback
+  for (const auto &t : T)
+    if (token == t.name) { rgb = {t.r, t.g, t.b}; break; }
+  if (token == "ICELIN" && pal == S411Palette::Night)
+    return {230, 230, 230};
+  const double f = pal == S411Palette::Day ? 1.0
+                 : pal == S411Palette::Dusk ? 0.5 : 0.2;
+  return {(unsigned char)(rgb.r * f), (unsigned char)(rgb.g * f),
+          (unsigned char)(rgb.b * f)};
+}
+
+// total concentration code -> colour token (S-411 CONC_CLASS)
+inline wxString S411ConcToken(const wxString &ct) {
+  struct Cls { const char *codes, *token; };
+  static const Cls CL[] = {
+      {" 98 ", "ICEFRE"},
+      {" 01 02 ", "ICEOPW"},
+      {" 10 12 13 20 23 24 30 34 ", "ICEC13"},
+      {" 35 40 45 46 50 56 57 60 67 ", "ICEC46"},
+      {" 68 70 78 79 80 89 ", "ICEC79"},
+      {" 81 90 91 ", "ICEC9T"},
+      {" 92 ", "ICEC10"},
+  };
+  if (!ct.IsEmpty()) {
+    wxString probe = " " + ct + " ";
+    for (const auto &c : CL)
+      if (wxString(c.codes).Find(probe) != wxNOT_FOUND) return c.token;
+  }
+  return "ICEUNK";
+}
+
+// stage of development code -> colour token (S-411 SOD_TOKEN)
+inline wxString S411SodToken(const wxString &sod) {
+  static const char *codes[] = {"81", "82", "83", "84", "85", "86", "87",
+                                "88", "89", "91", "93", "94", "95", "96",
+                                "97"};
+  for (const char *c : codes)
+    if (sod == c) return "ICES" + sod;
+  if (sod == "01") return "ICEFRE";
+  if (sod == "70" || sod == "80") return "ICEOPW";
+  return "ICEUNK";  // incl. "98" and unknown/empty
+}
+
+// concentration code -> maximum tenths covered (S-411 ctMaxTenths).
+// Two-digit range code "lo hi": upper bound = hi tenths, except hi==0 means
+// exactly lo, and the 9x codes (90=9/10, 91=9+/10, 92=10/10) which top out at
+// 9 resp. 10 tenths.
+inline int S411CtMaxTenths(const wxString &ct) {
+  if (ct == "99" || ct.IsEmpty()) return -1;              // unknown
+  if (ct == "98" || ct == "01" || ct == "02") return 0;   // ice free / open
+  long n;
+  if (!ct.ToLong(&n)) return -1;
+  if (n < 10) return 0;
+  long lo = n / 10, hi = n % 10;
+  if (hi == 0) return (int)lo;          // 90 -> 9
+  if (lo == 9) return 10;               // 91, 92 -> full cover
+  if (hi == 1) return 10;               // e.g. 81 -> up to 10
+  return (int)hi;                        // 46 -> 6
+}
+
+// ice-class traffic light (S-411 navToken); iceClass: "", IC, IB, IA, IASuper
+inline wxString S411NavToken(const wxString &ct, const wxString &iceClass) {
+  const int v = S411CtMaxTenths(ct);
+  if (v < 0) return "ICEUNK";
+  int amber = 1;  // no ice class: any ice is amber
+  if (iceClass == "IASuper") amber = 10;
+  else if (iceClass == "IA") amber = 8;
+  else if (iceClass == "IB" || iceClass == "IC") amber = 5;
+  if (v < 1) return "ICEFRE";
+  if (v < amber) return "ICEC13";
+  if (v < 9) return "ICEC46";
+  return "ICEC9T";
+}
+
+// area fill token for a feature in the given display mode
+inline wxString S411AreaTokenFor(const wxString &totalConcentration,
+                                 const wxString &stageOfDevelopment,
+                                 bool fastIce, S411Mode mode,
+                                 const wxString &iceClass) {
+  if (fastIce && mode != S411Mode::StageOfDevelopment) return "ICEFST";
+  switch (mode) {
+    case S411Mode::StageOfDevelopment:
+      return S411SodToken(stageOfDevelopment);
+    case S411Mode::Navigational:
+      return S411NavToken(totalConcentration, iceClass);
+    default:
+      return S411ConcToken(totalConcentration);
+  }
+}
+
+// line portrayal per feature type (S-411 LINE_PATTERNS)
+enum class S411Dash { Solid, LongDash, ShortDash, Dot, DotDash };
+struct S411LineStyle {
+  double width;
+  S411Dash dash;
+  unsigned short stipple;  // OpenGL line stipple pattern (0 = solid)
+  const char *token;       // colour token (ICELIN / ICEBRG)
+};
+
+inline bool S411LineStyleFor(const wxString &type, S411LineStyle &out) {
+  if (type == "IceEdge") out = {2.4, S411Dash::Solid, 0, "ICELIN"};
+  else if (type == "IcebergLimit") out = {2.0, S411Dash::LongDash, 0x0FF0, "ICEBRG"};
+  else if (type == "OpenWaterLimit") out = {1.4, S411Dash::LongDash, 0x0FF0, "ICELIN"};
+  else if (type == "AllKnownIceLimit") out = {2.0, S411Dash::DotDash, 0x1C47, "ICELIN"};
+  else if (type == "IceRidgeLine") out = {1.6, S411Dash::DotDash, 0x1C47, "ICELIN"};
+  else if (type == "IceLeadLine") out = {1.6, S411Dash::LongDash, 0x0FF0, "ICELIN"};
+  else if (type == "IceFractureLine") out = {1.4, S411Dash::LongDash, 0x0FF0, "ICELIN"};
+  else if (type == "IceCrackLine") out = {1.4, S411Dash::Dot, 0x3333, "ICELIN"};
+  else if (type == "JammedBrashBarrier") out = {2.8, S411Dash::ShortDash, 0x0F0F, "ICELIN"};
+  else { out = {1.5, S411Dash::Solid, 0, "ICELIN"}; return false; }
+  return true;
+}
