@@ -169,6 +169,17 @@ int main(int argc, char **argv) {
       if (f.latMin > -65 && f.latMax < -62 && f.lonMin > -58 && f.lonMax < -54)
         placed2 = true;
     Check(placed2, "v1 lon/lat detected and normalised (lat -64, lon -56)");
+
+    // Ambiguous value ranges (both axes within +/-90, e.g. the Baltic):
+    // the declared CRS decides - OGC CRS84 means lon/lat
+    S411Dataset ds3;
+    ok = LoadS411File(fx + "/v1_lonlat_crs84.gml", ds3, err);
+    Check(ok, "v1 lon/lat CRS84 dataset loads");
+    bool placed3 = false;
+    for (const auto &f : ds3.features)
+      if (f.latMin > 62 && f.latMax < 65 && f.lonMin > 20 && f.lonMax < 23)
+        placed3 = true;
+    Check(placed3, "ambiguous lon/lat decided by srsName CRS84 (lat 63, lon 21)");
   }
 
   // --- 8: portrayal - display modes, ice class, palettes ------------------

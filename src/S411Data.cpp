@@ -5,9 +5,12 @@
  * The parser is namespace-agnostic (matches local element names) so that
  * datasets from any producer load regardless of prefix conventions. The
  * dataset edition is detected from the root namespace declarations:
- *   - "iho.int/S411"    -> Edition 2.0.0, axis order lat/lon
- *   - "jcomm.info/ice"  -> Edition 1.x,   axis order lon/lat, v1 attribute
- *                          names (iceact/iceflz) and v1 feature codes
+ *   - "iho.int/S411"    -> Edition 2.0.0
+ *   - "jcomm.info/ice"  -> Edition 1.x, v1 attribute names (iceact/iceflz)
+ *                          and v1 feature codes
+ * The coordinate axis order is NOT tied to the edition: both editions occur
+ * as lat/lon (BSH, CIS, MetNo, NIC) and as lon/lat with 0..360 longitudes
+ * (AARI, NWS). It is detected per file - see DetectAxis().
  *
  * Copyright (C) 2026 by the s411_pi authors
  * License: GNU General Public License v2 or later (see LICENSE)
@@ -140,32 +143,46 @@ static void ParsePosText(const wxString &txt, const ParseCtx &ctx,
 }
 
 // File-wide axis detection (mirrors tools/convert_v1.py): coordinates are
-// lat/lon unless the FIRST value of every pair reaches beyond +/-90 while the
+// lat/lon unless the FIRST value of a pair reaches beyond +/-90 while the
 // SECOND never does - only a longitude can exceed 90, so that means lon/lat.
 // EPSG:4326 mandates lat/lon, but several ice services (AARI, NWS) ship
 // lon/lat with 0..360 longitudes, so the axis must be detected, not assumed.
-static void CollectPosNums(const wxXmlNode *n, std::vector<double> &nums) {
-  for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
-    if (!IsElem(c)) continue;
-    wxString loc = Local(c);
-    if (loc == "posList" || loc == "pos")
-      TokenizeNums(c->GetNodeContent(), nums);
-    else
-      CollectPosNums(c, nums);
+// Charts whose values never leave +/-90 on either axis (e.g. the Baltic) are
+// decided by the declared CRS instead: OGC CRS84 is the one common lon/lat
+// CRS, everything else (EPSG:4326, the S-100 default) means lat/lon.
+// Pairs are formed per posList/pos element so that one malformed element
+// cannot shift the pairing of every element after it.
+struct AxisScan {
+  double maxFirst = 0, maxSecond = 0;
+  bool crs84 = false;
+};
+
+static void ScanPosNums(const wxXmlNode *n, AxisScan &s) {
+  for (wxXmlAttribute *a = n->GetAttributes(); a; a = a->GetNext())
+    if (a->GetName().AfterLast(':') == "srsName" &&
+        a->GetValue().Contains("CRS84"))
+      s.crs84 = true;
+  wxString loc = Local(n);
+  if (loc == "posList" || loc == "pos") {
+    std::vector<double> nums;
+    TokenizeNums(n->GetNodeContent(), nums);
+    for (size_t i = 0; i + 1 < nums.size(); i += 2) {
+      double a = std::fabs(nums[i]), b = std::fabs(nums[i + 1]);
+      if (a > s.maxFirst) s.maxFirst = a;
+      if (b > s.maxSecond) s.maxSecond = b;
+    }
+    return;
   }
+  for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext())
+    if (IsElem(c)) ScanPosNums(c, s);
 }
 
 static Axis DetectAxis(const wxXmlNode *root) {
-  std::vector<double> nums;
-  CollectPosNums(root, nums);
-  double maxFirst = 0, maxSecond = 0;
-  for (size_t i = 0; i + 1 < nums.size(); i += 2) {
-    double a = std::fabs(nums[i]), b = std::fabs(nums[i + 1]);
-    if (a > maxFirst) maxFirst = a;
-    if (b > maxSecond) maxSecond = b;
-  }
-  if (maxFirst > 90.0001 && maxSecond <= 90.0001) return Axis::LonLat;
-  return Axis::LatLon;
+  AxisScan s;
+  ScanPosNums(root, s);
+  if (s.maxFirst > 90.0001 && s.maxSecond <= 90.0001) return Axis::LonLat;
+  if (s.maxSecond > 90.0001) return Axis::LatLon;
+  return s.crs84 ? Axis::LonLat : Axis::LatLon;  // both within +/-90
 }
 
 // keep paths continuous across the antimeridian (done once, at load time)
