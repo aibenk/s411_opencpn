@@ -13,6 +13,7 @@
 
 #include <wx/string.h>
 
+#include <utility>
 #include <vector>
 
 struct S411Pos {
@@ -34,6 +35,9 @@ struct S411Feature {
   wxString totalConcentration;                // IOC v5.2 code, may be empty
   wxString stageOfDevelopment;                // first Sa code, may be empty
   bool fastIce = false;                       // formOfIce 09 (v1: 08/09)
+  // every non-geometry leaf element (local name -> text, document order),
+  // shown verbatim in the on-click feature report
+  std::vector<std::pair<wxString, wxString>> attrs;
   // bounding box (unwrapped lons) for view culling
   double latMin = 90, latMax = -90, lonMin = 999, lonMax = -999;
 };
@@ -41,8 +45,24 @@ struct S411Feature {
 struct S411Dataset {
   wxString title;
   wxString file;
+  bool visible = true;                        // per-dataset overlay toggle
   std::vector<S411Feature> features;
+  // union of the feature boxes, for zoom-to-dataset
+  double latMin = 90, latMax = -90, lonMin = 999, lonMax = -999;
 };
+
+/** One picked feature (pointers into the dataset vector passed to
+ *  S411HitTest - only valid while that vector is unchanged). */
+struct S411Hit {
+  const S411Dataset *ds;
+  const S411Feature *feature;
+};
+
+/** Find the features at (lat, lon) among the VISIBLE datasets: areas by
+ *  even-odd point-in-polygon, lines and points within tolDeg degrees.
+ *  Results are ordered points first, then lines, then areas. */
+size_t S411HitTest(const std::vector<S411Dataset> &data, double lat,
+                   double lon, double tolDeg, std::vector<S411Hit> &out);
 
 /** Load one S-411 GML file (Edition 2.0.0 or 1.x). */
 bool LoadS411File(const wxString &path, S411Dataset &out, wxString &err);

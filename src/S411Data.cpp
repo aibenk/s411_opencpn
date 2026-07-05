@@ -25,6 +25,7 @@
 #include <wx/xml/xml.h>
 #include <wx/zipstrm.h>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
@@ -241,6 +242,27 @@ static const wxXmlNode *FindGeometry(const wxXmlNode *n) {
   return nullptr;
 }
 
+// flatten every non-geometry leaf element into name/value pairs for the
+// on-click feature report (covers both editions' attribute vocabularies,
+// including nested complex attributes like iceCharacteristic)
+static void CollectAttrs(const wxXmlNode *n, const wxXmlNode *geom,
+                         std::vector<std::pair<wxString, wxString>> &out) {
+  for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
+    if (!IsElem(c) || c == geom) continue;
+    wxString loc = Local(c);
+    if (loc == "boundedBy") continue;  // envelope corners are not attributes
+    bool leaf = true;
+    for (const wxXmlNode *g = c->GetChildren(); g; g = g->GetNext())
+      if (IsElem(g)) { leaf = false; break; }
+    if (!leaf) {
+      CollectAttrs(c, geom, out);
+      continue;
+    }
+    wxString v = c->GetNodeContent().Trim().Trim(false);
+    if (!v.IsEmpty() && v.length() <= 120) out.push_back({loc, v});
+  }
+}
+
 static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
                          const ParseCtx &ctx, S411Dataset &ds) {
   S411Feature f;
@@ -294,6 +316,7 @@ static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
     if (sod) f.stageOfDevelopment = sod->GetNodeContent().Trim().Trim(false);
     f.fastIce = AnyDescTextContains(node, "formOfIce", "09", "");
   }
+  CollectAttrs(node, geom, f.attrs);
 
   for (const auto &ring : f.rings)
     for (const auto &p : ring) {
@@ -350,7 +373,76 @@ static bool ParseDoc(wxXmlDocument &doc, const wxString &source,
                            source);
     return false;
   }
+  for (const auto &f : out.features) {
+    if (f.latMin < out.latMin) out.latMin = f.latMin;
+    if (f.latMax > out.latMax) out.latMax = f.latMax;
+    if (f.lonMin < out.lonMin) out.lonMin = f.lonMin;
+    if (f.lonMax > out.lonMax) out.lonMax = f.lonMax;
+  }
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// feature picking (pure geometry, exercised by the headless tests)
+// ---------------------------------------------------------------------------
+static bool PointInRings(const std::vector<std::vector<S411Pos>> &rings,
+                         double lat, double lon) {
+  bool in = false;  // even-odd across exterior ring(s) and holes
+  for (const auto &ring : rings)
+    for (size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
+      const S411Pos &a = ring[i], &b = ring[j];
+      if ((a.lat > lat) != (b.lat > lat) &&
+          lon < (b.lon - a.lon) * (lat - a.lat) / (b.lat - a.lat) + a.lon)
+        in = !in;
+    }
+  return in;
+}
+
+// planar distance in degrees from (lat, lon) to segment a-b, longitudes
+// compressed by cos(lat) so the tolerance is isotropic on the chart
+static double SegDistDeg(double lat, double lon, const S411Pos &a,
+                         const S411Pos &b) {
+  const double k = std::cos(lat * 3.14159265358979323846 / 180.0);
+  const double ax = a.lon * k, ay = a.lat, bx = b.lon * k, by = b.lat;
+  const double px = lon * k, py = lat;
+  const double dx = bx - ax, dy = by - ay;
+  double t = (dx * (px - ax) + dy * (py - ay)) / (dx * dx + dy * dy + 1e-12);
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  const double qx = ax + t * dx, qy = ay + t * dy;
+  return std::sqrt((px - qx) * (px - qx) + (py - qy) * (py - qy));
+}
+
+size_t S411HitTest(const std::vector<S411Dataset> &data, double lat,
+                   double lon, double tolDeg, std::vector<S411Hit> &out) {
+  out.clear();
+  for (const auto &ds : data) {
+    if (!ds.visible) continue;
+    for (const auto &f : ds.features) {
+      if (f.rings.empty() || f.rings[0].empty()) continue;
+      // bring the probe onto the feature's world copy (lons are unwrapped)
+      const double c = (f.lonMin + f.lonMax) / 2.0;
+      const double lonW = lon + 360.0 * std::floor((c - lon + 180.0) / 360.0);
+      if (lat < f.latMin - tolDeg || lat > f.latMax + tolDeg ||
+          lonW < f.lonMin - tolDeg || lonW > f.lonMax + tolDeg)
+        continue;
+      bool hit = false;
+      if (f.kind == S411Kind::Area) {
+        hit = PointInRings(f.rings, lat, lonW);
+      } else if (f.kind == S411Kind::Line) {
+        const auto &ln = f.rings[0];
+        for (size_t i = 0; i + 1 < ln.size() && !hit; i++)
+          hit = SegDistDeg(lat, lonW, ln[i], ln[i + 1]) <= tolDeg;
+      } else {
+        hit = SegDistDeg(lat, lonW, f.rings[0][0], f.rings[0][0]) <= tolDeg;
+      }
+      if (hit) out.push_back({&ds, &f});
+    }
+  }
+  std::stable_sort(out.begin(), out.end(),
+                   [](const S411Hit &a, const S411Hit &b) {
+                     return (int)a.feature->kind < (int)b.feature->kind;
+                   });  // points first, then lines, then areas
+  return out.size();
 }
 
 bool LoadS411File(const wxString &path, S411Dataset &out, wxString &err) {

@@ -6,6 +6,7 @@
  ***************************************************************************/
 #include "s411_pi.h"
 
+#include <wx/checklst.h>
 #include <wx/choice.h>
 #include <wx/dcmemory.h>
 #include <wx/fileconf.h>
@@ -14,6 +15,7 @@
 #include <wx/graphics.h>
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
+#include <wx/slider.h>
 #include <wx/stattext.h>
 
 #include <cmath>
@@ -28,8 +30,68 @@
 #endif
 
 // ===========================================================================
+// legend for the active display mode / palette (mirrors the web viewer)
+// ===========================================================================
+class S411LegendPanel : public wxPanel {
+public:
+  S411LegendPanel(wxWindow *parent, s411_pi *pi)
+      : wxPanel(parent), m_pi(pi) {
+    Bind(wxEVT_PAINT, &S411LegendPanel::OnPaint, this);
+  }
+
+  void Rebuild() {
+    m_rows.clear();
+    switch (m_pi->m_mode) {
+      case S411Mode::StageOfDevelopment:
+        m_rows = {{"ICES81", "New ice"},          {"ICES82", "Nilas, ice rind"},
+                  {"ICES83", "Young ice"},        {"ICES84", "Grey ice"},
+                  {"ICES85", "Grey-white ice"},   {"ICES87", "Thin first-year"},
+                  {"ICES91", "Medium first-year"},{"ICES93", "Thick first-year"},
+                  {"ICES95", "Old ice"},          {"ICES96", "Second-year"},
+                  {"ICES97", "Multi-year"},       {"ICEUNK", "Unknown"}};
+        break;
+      case S411Mode::Navigational:
+        m_rows = {{"ICEFRE", "Safe (ice free)"},
+                  {"ICEC13", "Below ice-class limit"},
+                  {"ICEC46", "Caution"},
+                  {"ICEC9T", "Hazardous"},
+                  {"ICEFST", "Fast ice"},
+                  {"ICEUNK", "Unknown"}};
+        break;
+      default:
+        m_rows = {{"ICEFRE", "Ice free"},
+                  {"ICEOPW", "Open water / bergy water"},
+                  {"ICEC13", "1-3/10"},   {"ICEC46", "4-6/10"},
+                  {"ICEC79", "7-8/10"},   {"ICEC9T", "9-9+/10"},
+                  {"ICEC10", "10/10"},    {"ICEFST", "Fast ice"},
+                  {"ICEUNK", "Unknown"}};
+    }
+    SetMinSize(wxSize(230, (int)m_rows.size() * 18 + 4));
+    Refresh();
+  }
+
+private:
+  void OnPaint(wxPaintEvent &) {
+    wxPaintDC dc(this);
+    int y = 2;
+    for (const auto &r : m_rows) {
+      S411Rgb c = S411TokenRgb(r.first, m_pi->m_palette);
+      dc.SetBrush(wxBrush(wxColour(c.r, c.g, c.b)));
+      dc.SetPen(wxPen(wxColour(80, 80, 80)));
+      dc.DrawRectangle(2, y, 24, 14);
+      dc.DrawText(r.second, 32, y - 1);
+      y += 18;
+    }
+  }
+
+  s411_pi *m_pi;
+  std::vector<std::pair<wxString, wxString>> m_rows;
+};
+
+// ===========================================================================
 // control dialog: mirrors the web viewer's left panel (mode / ice class /
-// palette) plus load/clear/show. Non-modal so it can stay open as a panel.
+// palette) plus load/clear/show, per-dataset visibility list, zoom-to-data,
+// fill opacity and a legend. Non-modal so it can stay open as a panel.
 // ===========================================================================
 class S411CtrlDialog : public wxDialog {
 public:
@@ -53,7 +115,18 @@ public:
     m_status = new wxStaticText(this, wxID_ANY, "");
     s->Add(m_status, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
 
-    auto *grid = new wxFlexGridSizer(3, 2, b, b);
+    // per-dataset visibility list + zoom/remove
+    m_list = new wxCheckListBox(this, wxID_ANY, wxDefaultPosition,
+                                wxSize(-1, 90));
+    s->Add(m_list, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
+    auto *dsBtns = new wxBoxSizer(wxHORIZONTAL);
+    auto *zoom = new wxButton(this, wxID_ANY, "Zoom to data");
+    auto *remove = new wxButton(this, wxID_ANY, "Remove");
+    dsBtns->Add(zoom, 0, wxRIGHT, b);
+    dsBtns->Add(remove, 0);
+    s->Add(dsBtns, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+
+    auto *grid = new wxFlexGridSizer(4, 2, b, b);
     grid->AddGrowableCol(1, 1);
 
     grid->Add(new wxStaticText(this, wxID_ANY, "Display mode"), 0,
@@ -82,7 +155,15 @@ public:
     m_pal->Append("Night");
     grid->Add(m_pal, 1, wxEXPAND);
 
+    grid->Add(new wxStaticText(this, wxID_ANY, "Fill opacity"), 0,
+              wxALIGN_CENTRE_VERTICAL);
+    m_opacity = new wxSlider(this, wxID_ANY, 67, 10, 100);
+    grid->Add(m_opacity, 1, wxEXPAND);
+
     s->Add(grid, 0, wxEXPAND | wxALL, b);
+
+    m_legend = new S411LegendPanel(this, pi);
+    s->Add(m_legend, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
 
     auto *close = new wxButton(this, wxID_CLOSE, "Close");
     s->Add(close, 0, wxALIGN_RIGHT | wxALL, b);
@@ -96,8 +177,12 @@ public:
     m_mode->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_class->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_pal->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
+    m_opacity->Bind(wxEVT_SLIDER, &S411CtrlDialog::OnAny, this);
     load->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnLoad, this);
     clear->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnClear, this);
+    m_list->Bind(wxEVT_CHECKLISTBOX, &S411CtrlDialog::OnListCheck, this);
+    zoom->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnZoom, this);
+    remove->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnRemove, this);
     close->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Hide(); });
     Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &) { Hide(); });
   }
@@ -111,27 +196,48 @@ public:
       if (m_pi->m_iceClass == cls[i]) ci = i;
     m_class->SetSelection(ci);
     m_pal->SetSelection((int)m_pi->m_palette);
+    m_opacity->SetValue(wxMax(10, wxMin(100, m_pi->m_alpha * 100 / 255)));
     m_class->Enable(m_pi->m_mode == S411Mode::Navigational);
+    m_legend->Rebuild();
+    Layout();
+    Fit();
   }
 
   void UpdateStatus() {
     m_status->SetLabel(wxString::Format("%zu dataset(s), %zu feature(s) loaded",
                                         m_pi->DatasetCount(),
                                         m_pi->FeatureCount()));
+    RebuildList();
     Layout();
   }
 
 private:
+  void RebuildList() {
+    m_list->Clear();
+    for (const auto &ds : m_pi->Data()) {
+      int i = m_list->Append(wxString::Format(
+          "%s  (%zu features)", ds.title, ds.features.size()));
+      m_list->Check(i, ds.visible);
+    }
+  }
   void ToState() {
     m_pi->m_show = m_show->GetValue();
     m_pi->m_mode = (S411Mode)m_mode->GetSelection();
     static const char *cls[] = {"", "IC", "IB", "IA", "IASuper"};
     m_pi->m_iceClass = cls[wxMax(0, m_class->GetSelection())];
     m_pi->m_palette = (S411Palette)m_pal->GetSelection();
+    m_pi->m_alpha = wxMax(26, wxMin(255, m_opacity->GetValue() * 255 / 100));
     m_class->Enable(m_pi->m_mode == S411Mode::Navigational);
   }
   void OnAny(wxCommandEvent &) {
+    S411Mode before = m_pi->m_mode;
+    S411Palette palBefore = m_pi->m_palette;
     ToState();
+    if (m_pi->m_mode != before || m_pi->m_palette != palBefore) {
+      m_legend->Rebuild();
+      Layout();
+      Fit();
+    }
     m_pi->Refresh();
   }
   void OnLoad(wxCommandEvent &) {
@@ -146,11 +252,35 @@ private:
     UpdateStatus();
     m_pi->Refresh();
   }
+  void OnListCheck(wxCommandEvent &e) {
+    const int i = e.GetInt();
+    if (i >= 0 && (size_t)i < m_pi->Data().size()) {
+      m_pi->Data()[i].visible = m_list->IsChecked(i);
+      m_pi->Refresh();
+    }
+  }
+  void OnZoom(wxCommandEvent &) {
+    m_pi->ZoomToData(m_list->GetSelection());  // wxNOT_FOUND -> all visible
+  }
+  void OnRemove(wxCommandEvent &) {
+    const int i = m_list->GetSelection();
+    if (i < 0 || (size_t)i >= m_pi->Data().size()) return;
+    m_pi->Data().erase(m_pi->Data().begin() + i);
+    if (m_pi->Data().empty()) {
+      m_pi->m_show = false;
+      m_show->SetValue(false);
+    }
+    UpdateStatus();
+    m_pi->Refresh();
+  }
 
   s411_pi *m_pi;
   wxCheckBox *m_show;
   wxChoice *m_mode, *m_class, *m_pal;
+  wxSlider *m_opacity;
   wxStaticText *m_status;
+  wxCheckListBox *m_list;
+  S411LegendPanel *m_legend;
 };
 
 // ===========================================================================
@@ -178,7 +308,10 @@ wxString s411_pi::GetLongDescription() {
          "archives - and renders them on the chart with the WMO ice chart\n"
          "colour code. Switchable display mode (concentration / stage of\n"
          "development / ice-class traffic light), vessel ice class and\n"
-         "day/dusk/night palette, matching the S-411 web viewer.";
+         "day/dusk/night palette, matching the S-411 web viewer.\n"
+         "Click an ice feature for its attribute report; the control panel\n"
+         "offers a legend, per-dataset visibility, zoom-to-data and fill\n"
+         "opacity.";
 }
 
 void s411_pi::MakeIcon() {
@@ -214,7 +347,8 @@ int s411_pi::Init(void) {
                               "S-411 ice information: load and portrayal",
                               nullptr, -1, 0, this);
   return WANTS_OVERLAY_CALLBACK | WANTS_OPENGL_OVERLAY_CALLBACK |
-         INSTALLS_TOOLBAR_TOOL | WANTS_TOOLBAR_CALLBACK | WANTS_PREFERENCES;
+         INSTALLS_TOOLBAR_TOOL | WANTS_TOOLBAR_CALLBACK | WANTS_PREFERENCES |
+         WANTS_MOUSE_EVENTS;
 }
 
 bool s411_pi::DeInit(void) {
@@ -222,6 +356,11 @@ bool s411_pi::DeInit(void) {
   if (m_dialog) {
     m_dialog->Destroy();
     m_dialog = nullptr;
+  }
+  if (m_report) {
+    m_report->Destroy();
+    m_report = nullptr;
+    m_reportText = nullptr;
   }
   if (m_toolId != -1) RemovePlugInTool(m_toolId);
   m_toolId = -1;
@@ -262,7 +401,50 @@ void s411_pi::LoadFiles() {
   if (!errors.IsEmpty())
     wxMessageBox(errors, "S-411: some files could not be loaded",
                  wxOK | wxICON_WARNING, GetOCPNCanvasWindow());
-  if (m_data.size() > before) m_show = true;  // show as soon as data arrives
+  if (m_data.size() > before) {
+    m_show = true;  // show as soon as data arrives
+    // jump to the freshly loaded data so it is never invisibly off-screen
+    double la = 90, lA = -90, lo = 999, lO = -999;
+    for (size_t i = before; i < m_data.size(); i++) {
+      la = wxMin(la, m_data[i].latMin);
+      lA = wxMax(lA, m_data[i].latMax);
+      lo = wxMin(lo, m_data[i].lonMin);
+      lO = wxMax(lO, m_data[i].lonMax);
+    }
+    JumpToBox(la, lA, lo, lO);
+  }
+}
+
+// jump the chart so the given lat/lon box fills ~80% of the canvas
+void s411_pi::JumpToBox(double latMin, double latMax, double lonMin,
+                        double lonMax) {
+  if (latMin > latMax || lonMin > lonMax) return;
+  const double lat = (latMin + latMax) / 2.0;
+  double lon = (lonMin + lonMax) / 2.0;
+  lon -= 360.0 * std::floor((lon + 180.0) / 360.0);  // back to [-180, 180)
+  const double spanLat = wxMax(0.2, latMax - latMin);
+  const double spanLon = wxMax(0.2, lonMax - lonMin);
+  const double mPerDegLat = 111320.0;
+  const double mPerDegLon =
+      wxMax(1000.0, 111320.0 * std::cos(lat * 3.14159265358979323846 / 180.0));
+  const double pixW = m_haveVp ? m_lastVp.pix_width : 1000.0;
+  const double pixH = m_haveVp ? m_lastVp.pix_height : 700.0;
+  double ppm = 0.8 * wxMin(pixW / (spanLon * mPerDegLon),
+                           pixH / (spanLat * mPerDegLat));
+  ppm = wxMax(1e-5, wxMin(0.05, ppm));
+  JumpToPosition(lat, lon, ppm);
+}
+
+void s411_pi::ZoomToData(int idx) {
+  double la = 90, lA = -90, lo = 999, lO = -999;
+  for (size_t i = 0; i < m_data.size(); i++) {
+    if (idx >= 0 ? (size_t)idx != i : !m_data[i].visible) continue;
+    la = wxMin(la, m_data[i].latMin);
+    lA = wxMax(lA, m_data[i].latMax);
+    lo = wxMin(lo, m_data[i].lonMin);
+    lO = wxMax(lO, m_data[i].lonMax);
+  }
+  JumpToBox(la, lA, lo, lO);
 }
 
 void s411_pi::ClearData() {
@@ -295,6 +477,80 @@ void s411_pi::OnToolbarToolCallback(int id) {
 void s411_pi::ShowPreferencesDialog(wxWindow *parent) { ShowControl(); }
 
 // ---------------------------------------------------------------------------
+// feature picking: a plain click (no drag) on the overlay opens a report
+// ---------------------------------------------------------------------------
+bool s411_pi::MouseEventHook(wxMouseEvent &ev) {
+  if (!m_show || m_data.empty() || !m_haveVp) return false;
+  if (ev.LeftDown()) {
+    m_downPos = ev.GetPosition();
+    m_downValid = true;
+    return false;  // never eat the down event - panning must keep working
+  }
+  if (!ev.LeftUp() || !m_downValid) return false;
+  m_downValid = false;
+  const wxPoint up = ev.GetPosition();
+  if (abs(up.x - m_downPos.x) > 3 || abs(up.y - m_downPos.y) > 3)
+    return false;  // that was a drag/pan, not a click
+  double lat, lon, latR, lonR;
+  GetCanvasLLPix(&m_lastVp, up, &lat, &lon);
+  GetCanvasLLPix(&m_lastVp, wxPoint(up.x + 8, up.y), &latR, &lonR);
+  const double tol = std::fabs(lonR - lon);  // ~8 px expressed in degrees
+  std::vector<S411Hit> hits;
+  if (!S411HitTest(m_data, lat, lon, tol, hits)) return false;
+  ShowPickReport(hits, lat, lon);
+  return true;  // consumed - the click hit an ice feature
+}
+
+void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
+                             double lon) {
+  wxString txt = wxString::Format(
+      "Position  %.4f°%s  %.4f°%s\n\n", std::fabs(lat),
+      lat >= 0 ? "N" : "S", std::fabs(lon), lon >= 0 ? "E" : "W");
+  for (const auto &h : hits) {
+    txt += h.feature->type;
+    if (h.feature->fastIce) txt += "   [fast ice]";
+    txt += "\n  dataset: " + h.ds->title + "\n";
+    for (const auto &kv : h.feature->attrs) {
+      txt += "  " + kv.first + " = " + kv.second;
+      const wxString n = kv.first.Lower();
+      wxString lbl;
+      if (n.Contains("concentration") || n == "iceact")
+        lbl = S411ConcLabel(kv.second);
+      else if (n.Contains("stageofdevelopment") || n.Contains("icestage") ||
+               n == "icesod")
+        lbl = S411SodLabel(kv.second);
+      if (!lbl.IsEmpty()) txt += "   (" + lbl + ")";
+      txt += "\n";
+    }
+    if (h.feature->attrs.empty()) txt += "  (no attributes)\n";
+    txt += "\n";
+  }
+  if (!m_report) {
+    m_report = new wxDialog(GetOCPNCanvasWindow(), wxID_ANY,
+                            "S-411 feature report", wxDefaultPosition,
+                            wxSize(400, 340),
+                            wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+    auto *s = new wxBoxSizer(wxVERTICAL);
+    m_reportText =
+        new wxTextCtrl(m_report, wxID_ANY, "", wxDefaultPosition,
+                       wxDefaultSize,
+                       wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP);
+    m_reportText->SetFont(wxFont(9, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL,
+                                 wxFONTWEIGHT_NORMAL));
+    s->Add(m_reportText, 1, wxEXPAND | wxALL, 5);
+    auto *close = new wxButton(m_report, wxID_CLOSE, "Close");
+    s->Add(close, 0, wxALIGN_RIGHT | wxALL, 5);
+    m_report->SetSizer(s);
+    close->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { m_report->Hide(); });
+    m_report->Bind(wxEVT_CLOSE_WINDOW,
+                   [this](wxCloseEvent &) { m_report->Hide(); });
+  }
+  m_reportText->SetValue(txt);
+  m_report->Show();
+  m_report->Raise();
+}
+
+// ---------------------------------------------------------------------------
 // configuration persistence
 // ---------------------------------------------------------------------------
 void s411_pi::LoadConfig() {
@@ -306,6 +562,8 @@ void s411_pi::LoadConfig() {
   v = cfg->Read("Palette", 0L); m_palette = (S411Palette)wxMin(2, wxMax(0, (int)v));
   m_iceClass = cfg->Read("IceClass", wxString(""));
   m_lastDir = cfg->Read("LastDir", wxString(""));
+  v = cfg->Read("FillAlpha", 170L);
+  m_alpha = (int)wxMax(26, wxMin(255, v));
 }
 
 void s411_pi::SaveConfig() {
@@ -316,6 +574,7 @@ void s411_pi::SaveConfig() {
   cfg->Write("Palette", (long)m_palette);
   cfg->Write("IceClass", m_iceClass);
   cfg->Write("LastDir", m_lastDir);
+  cfg->Write("FillAlpha", (long)m_alpha);
   cfg->Flush();
 }
 
@@ -399,6 +658,7 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
 #endif
 
   for (const auto &ds : m_data) {
+    if (!ds.visible) continue;
     for (int pass = 0; pass < 3; pass++) {
       for (const auto &f : ds.features) {
         if ((int)f.kind != (pass == 0 ? (int)S411Kind::Area
@@ -422,8 +682,8 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
               path.CloseSubpath();
             }
             gc->SetBrush(wxBrush(berg
-                ? wxColour(0, 0, 0, 60)
-                : wxColour(fill.Red(), fill.Green(), fill.Blue(), 170)));
+                ? wxColour(0, 0, 0, wxMin(60, m_alpha))
+                : wxColour(fill.Red(), fill.Green(), fill.Blue(), m_alpha)));
             gc->FillPath(path, wxODDEVEN_RULE);
             gc->SetPen(wxPen(wxColour(0, 0, 0, 120), 1));
             gc->StrokePath(path);
@@ -475,13 +735,14 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
   glDisable(GL_TEXTURE_2D);
 
   for (const auto &ds : m_data) {
+    if (!ds.visible) continue;
     for (const auto &f : ds.features) {
       if (f.kind != S411Kind::Area || f.tris.empty() || Culled(f, vp))
         continue;
       bool berg = f.type == "IcebergArea";
       wxColour fill = s411_pi_AreaColour(f, m_mode, m_iceClass, m_palette);
-      if (berg) glColor4ub(0, 0, 0, 60);
-      else glColor4ub(fill.Red(), fill.Green(), fill.Blue(), 170);
+      if (berg) glColor4ub(0, 0, 0, (GLubyte)wxMin(60, m_alpha));
+      else glColor4ub(fill.Red(), fill.Green(), fill.Blue(), (GLubyte)m_alpha);
 
       const double k = WorldShift((f.lonMin + f.lonMax) / 2.0, vp->clon);
       glBegin(GL_TRIANGLES);
@@ -542,15 +803,23 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
 // overlay entry points
 // ---------------------------------------------------------------------------
 bool s411_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp) {
+  m_lastVp = *vp;
+  m_haveVp = true;
   return RenderDC(dc, vp);
 }
 bool s411_pi::RenderGLOverlay(wxGLContext *, PlugIn_ViewPort *vp) {
+  m_lastVp = *vp;
+  m_haveVp = true;
   return RenderGL(vp);
 }
 bool s411_pi::RenderOverlayMultiCanvas(wxDC &dc, PlugIn_ViewPort *vp, int) {
+  m_lastVp = *vp;
+  m_haveVp = true;
   return RenderDC(dc, vp);
 }
 bool s411_pi::RenderGLOverlayMultiCanvas(wxGLContext *, PlugIn_ViewPort *vp,
                                          int) {
+  m_lastVp = *vp;
+  m_haveVp = true;
   return RenderGL(vp);
 }

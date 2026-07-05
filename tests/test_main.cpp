@@ -180,6 +180,27 @@ int main(int argc, char **argv) {
       if (f.latMin > 62 && f.latMax < 65 && f.lonMin > 20 && f.lonMax < 23)
         placed3 = true;
     Check(placed3, "ambiguous lon/lat decided by srsName CRS84 (lat 63, lon 21)");
+
+    // --- 7c: attributes, hit test, code labels ----------------------------
+    Check(!ds3.features.empty() && !ds3.features[0].attrs.empty(),
+          "feature attributes captured for the pick report");
+    Check(ds3.latMin > 62 && ds3.latMax < 65 && ds3.lonMin > 20 &&
+              ds3.lonMax < 23,
+          "dataset bounding box aggregated (zoom-to-data)");
+
+    std::vector<S411Dataset> pool = {ds3};
+    std::vector<S411Hit> hits;
+    Check(S411HitTest(pool, 63.5, 21.5, 0.05, hits) >= 1,
+          "hit test: click inside the area finds the feature");
+    Check(S411HitTest(pool, 60.0, 21.5, 0.05, hits) == 0,
+          "hit test: click far away finds nothing");
+    pool[0].visible = false;
+    Check(S411HitTest(pool, 63.5, 21.5, 0.05, hits) == 0,
+          "hit test: hidden datasets are not picked");
+
+    Check(S411ConcLabel("92") == "10/10", "conc label 92 -> 10/10");
+    Check(S411ConcLabel("91") == "9+/10", "conc label 91 -> 9+/10");
+    Check(S411SodLabel("95") == "old ice", "SoD label 95 -> old ice");
   }
 
   // --- 8: portrayal - display modes, ice class, palettes ------------------

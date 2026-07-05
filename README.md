@@ -12,7 +12,12 @@ chart overlay with the WMO ice chart colour code:
 - **Switchable display mode** (like the web viewer): ice concentration,
   stage of development, or navigational **ice-class traffic light**
   (green/amber/red by vessel ice class IC…IA Super)
-- **Day / Dusk / Night palettes**
+- **Day / Dusk / Night palettes**, adjustable fill opacity, **legend** for
+  the active mode in the control panel
+- **Click a feature** for its attribute report (all S-411/v1 attributes,
+  concentration and stage-of-development codes decoded to plain text)
+- **Per-dataset visibility list**, remove single datasets, **zoom to data**
+  (the chart also jumps to freshly loaded data automatically)
 - Antimeridian-safe (NWS Alaska charts crossing 180° render correctly)
 - Namespace-agnostic GML parser: loads S-411 2.0.0 datasets from any
   producer (BSH, CIS, NIC, MET Norway, AARI, NWS); lat/lon axis-order and
@@ -39,13 +44,14 @@ attribute names (`iceact`/`iceflz` → concentration/fast ice).
 
 ## Status
 
-**v0.2.0 — beta.** The parsing/loading pipeline (GML editions, exchange sets,
-zips, antimeridian handling, tessellation) is exercised in CI against **real
-operational datasets** (BSH Baltic chart with 337 features, NWS Alaska chart
-crossing 180°, ice-report stations, a complete exchange set as directory and
-as zip). Rendering inside a running OpenCPN has not had a hands-on pass yet.
-Pick reports, egg-code decoding and the full Annex C point symbol set are not
-implemented yet. Concave ice polygons (with holes) are triangulated once at
+**v0.4.0 — beta.** The parsing/loading pipeline (GML editions, exchange sets,
+zips, antimeridian handling, axis-order detection, tessellation, hit testing)
+is exercised in CI against **real operational datasets** (BSH Baltic chart
+with 337 features, NWS Alaska chart crossing 180°, ice-report stations, a
+complete exchange set as directory and as zip). Pick reports with decoded
+codes, a legend, per-dataset visibility and zoom-to-data are built in; the
+full Annex C point symbol set is not implemented yet (points render as
+generic markers). Concave ice polygons (with holes) are triangulated once at
 load time, so panning/zooming does not re-tessellate per frame.
 
 ## Usage

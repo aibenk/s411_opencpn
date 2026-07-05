@@ -84,6 +84,49 @@ inline wxString S411SodToken(const wxString &sod) {
   return "ICEUNK";  // incl. "98" and unknown/empty
 }
 
+// human-readable code labels for the on-click feature report
+// (IOC v5.2 tables 30300/30301 resp. the stage-of-development table)
+inline wxString S411ConcLabel(const wxString &ct) {
+  struct L { const char *code, *label; };
+  static const L T[] = {
+      {"98", "ice free"},   {"01", "open water (<1/10)"},
+      {"02", "bergy water"},{"10", "1/10"},  {"12", "1-2/10"},
+      {"13", "1-3/10"},     {"20", "2/10"},  {"23", "2-3/10"},
+      {"24", "2-4/10"},     {"30", "3/10"},  {"34", "3-4/10"},
+      {"35", "3-5/10"},     {"40", "4/10"},  {"45", "4-5/10"},
+      {"46", "4-6/10"},     {"50", "5/10"},  {"56", "5-6/10"},
+      {"57", "5-7/10"},     {"60", "6/10"},  {"67", "6-7/10"},
+      {"68", "6-8/10"},     {"70", "7/10"},  {"78", "7-8/10"},
+      {"79", "7-9/10"},     {"80", "8/10"},  {"81", "8-10/10"},
+      {"89", "8-9/10"},     {"90", "9/10"},  {"91", "9+/10"},
+      {"92", "10/10"},      {"99", "unknown"},
+  };
+  for (const auto &t : T)
+    if (ct == t.code) return t.label;
+  return "";
+}
+
+inline wxString S411SodLabel(const wxString &sod) {
+  struct L { const char *code, *label; };
+  static const L T[] = {
+      {"01", "ice free"},        {"70", "brash ice"},
+      {"80", "no stage reported"},{"81", "new ice"},
+      {"82", "nilas, ice rind"}, {"83", "young ice"},
+      {"84", "grey ice"},        {"85", "grey-white ice"},
+      {"86", "first-year ice"},  {"87", "thin first-year ice"},
+      {"88", "thin first-year, stage 1"},
+      {"89", "thin first-year, stage 2"},
+      {"91", "medium first-year ice"},
+      {"93", "thick first-year ice"},
+      {"94", "residual ice"},    {"95", "old ice"},
+      {"96", "second-year ice"}, {"97", "multi-year ice"},
+      {"98", "glacier ice"},     {"99", "unknown"},
+  };
+  for (const auto &t : T)
+    if (sod == t.code) return t.label;
+  return "";
+}
+
 // concentration code -> maximum tenths covered (S-411 ctMaxTenths).
 // Two-digit range code "lo hi": upper bound = hi tenths, except hi==0 means
 // exactly lo, and the 9x codes (90=9/10, 91=9+/10, 92=10/10) which top out at

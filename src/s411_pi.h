@@ -32,7 +32,7 @@ public:
   int GetAPIVersionMajor() override { return 1; }
   int GetAPIVersionMinor() override { return 16; }
   int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 3; }
+  int GetPlugInVersionMinor() override { return 4; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;
@@ -51,6 +51,9 @@ public:
   bool RenderGLOverlayMultiCanvas(wxGLContext *pcontext, PlugIn_ViewPort *vp,
                                   int canvasIndex) override;
 
+  // feature picking: plain click (no drag) -> attribute report
+  bool MouseEventHook(wxMouseEvent &event) override;
+
   // called back by the control dialog
   void LoadFiles();
   void ClearData();
@@ -58,12 +61,17 @@ public:
   void Refresh();
   size_t DatasetCount() const { return m_data.size(); }
   size_t FeatureCount() const;
+  std::vector<S411Dataset> &Data() { return m_data; }
+  /** Jump the chart to dataset `idx`, or to the union of all visible
+   *  datasets when idx < 0. */
+  void ZoomToData(int idx);
 
   // portrayal state (read/written by the control dialog)
   bool m_show = false;
   S411Mode m_mode = S411Mode::Concentration;
   wxString m_iceClass;                 // "", IC, IB, IA, IASuper
   S411Palette m_palette = S411Palette::Day;
+  int m_alpha = 170;                   // area fill opacity, 26..255
 
 private:
   void MakeIcon();
@@ -72,10 +80,19 @@ private:
   bool RenderGL(PlugIn_ViewPort *vp);
   void LoadConfig();
   void SaveConfig();
+  void ShowPickReport(const std::vector<S411Hit> &hits, double lat,
+                      double lon);
+  void JumpToBox(double latMin, double latMax, double lonMin, double lonMax);
 
   wxBitmap m_icon;
   int m_toolId = -1;
   wxString m_lastDir;
   std::vector<S411Dataset> m_data;
   S411CtrlDialog *m_dialog = nullptr;
+  wxDialog *m_report = nullptr;        // non-modal pick report
+  wxTextCtrl *m_reportText = nullptr;
+  PlugIn_ViewPort m_lastVp;            // viewport of the last render pass
+  bool m_haveVp = false;
+  wxPoint m_downPos;                   // click-vs-drag discrimination
+  bool m_downValid = false;
 };
