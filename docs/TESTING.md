@@ -24,9 +24,16 @@ cmake --build build --parallel
 ./build/s411_test tests/fixtures
 ```
 
-**Soll:** `ALL TESTS PASSED (0 failures)` — 17 Tests gegen echte Daten
-(BSH-Ostseekarte mit 337 Features, NWS-Alaska über 180°, Eisbericht-Stationen,
-Exchange-Set als Verzeichnis und als Zip).
+**Soll:** `ALL TESTS PASSED (0 failures)` — 53 Checks gegen echte Daten:
+BSH-Ostseekarte mit 337 Features, NWS-Alaska über 180°, Eisbericht-Stationen,
+Exchange-Set als Verzeichnis und als Zip, **Achsen-Erkennung** (lat/lon vs.
+lon/lat, 0–360°-Längen, CRS84-`srsName` für den ambigen Ostsee-Fall),
+Hit-Test fürs Feature-Picking, Attribut-Erfassung, Code-Labels und die
+Ampel-Semantik (identische Tabellen wie Web-Viewer, `rules/main.xsl` und
+`tools/validate.py` im Spez-Repo — dort per CI gegengeprüft).
+
+**Windows ohne CMake:** `testbuild\s411_test.exe tests\fixtures` (wird von
+den Build-Schritten in diesem Repo mitgepflegt).
 
 ---
 
@@ -76,15 +83,26 @@ sudo cp build/libs411_pi.so /usr/lib/opencpn/        # ggf. Pfad anpassen
    **Steuerdialog** (es wird **nichts automatisch geladen**) — wie das linke
    Panel im Web-Viewer:
    - **Show ice overlay** – ein/aus (Daten bleiben geladen)
-   - **Load data… / Clear** – Datensätze hinzufügen / entfernen
+   - **Load data… / Clear** – Datensätze hinzufügen / alle entfernen. Nach dem
+     Laden **springt die Karte automatisch** zu den neuen Daten.
+   - **Datensatzliste** – Checkbox = Sichtbarkeit pro Datensatz; *Zoom to
+     data* (markierter Datensatz, ohne Markierung: alle sichtbaren);
+     *Remove* entfernt den markierten einzeln
    - **Display mode** – *Ice concentration* / *Stage of development* /
      *Navigational (ice-class traffic light)*
    - **Vessel ice class** – nur im Navigational-Modus aktiv (No class …
      IA Super)
    - **Colour palette** – *Day* / *Dusk* / *Night*
-   Modus, Eisklasse und Palette werden gespeichert und beim nächsten Start
-   wiederhergestellt. Denselben Dialog gibt es unter *Options → Plugins →
-   S-411 Ice → Preferences*.
+   - **Fill opacity** – Deckkraft der Flächenfüllungen
+   - **Legende** – passt sich Modus und Palette an
+   Modus, Eisklasse, Palette und Deckkraft werden gespeichert und beim
+   nächsten Start wiederhergestellt. Denselben Dialog gibt es unter
+   *Options → Plugins → S-411 Ice → Preferences*.
+4. **Feature-Report:** kurzer Klick (ohne Ziehen, < 4 px Mausbewegung) auf
+   ein Eis-Feature öffnet ein Fenster mit allen Attributen; Konzentrations-
+   und Entwicklungsstadium-Codes werden im Klartext decodiert
+   (z. B. `totalConcentration = 92 (10/10)`). Pannen/Zoomen bleibt
+   unverändert; Klick auf freie See tut nichts.
 
 ### 2.4 Testdaten beschaffen
 
@@ -112,9 +130,19 @@ Zip unverändert ins Plugin geben.
 
 ## 3. Test-Checkliste (mit Soll-Ergebnissen)
 
-Der 411-Button ist ein Umschalter: **Aktivieren öffnet den Dateidialog**
-(Abbrechen behält bereits Geladenes), **Deaktivieren blendet aus** (Daten
-bleiben erhalten).
+Der 411-Button öffnet den Steuerdialog; geladen wird ausschließlich über
+*Load data…* dort. Zuerst der wichtigste Test — **Georeferenzierung** (der
+historische Fehlerfall „Ostsee-Eis im Indischen Ozean" war eine erzwungene
+lon/lat-Interpretation für Edition-1.x-Dateien):
+
+| # | Test | Soll |
+|---|---|---|
+| G1 | BSH-Winter-Zip laden (`reference/real_data/S411_ek1-20250220.zip` im seaice-Repo oder frisch vom BSH-FTP) | Karte springt automatisch zur Ostsee; Eis liegt im Bottnischen/Finnischen Meerbusen (~63°N/21°E) — **nicht** am Persischen Golf/Indischen Ozean |
+| G2 | `tests/fixtures/v1_lonlat_crs84.gml` laden | Fläche im Bottnischen Meerbusen (63–64°N, 21–22°E) — lon/lat-Datei, erkennbar **nur** am CRS84-`srsName` (beide Achsen ≤ 90°) |
+| G3 | `tests/fixtures/v1_lonlat.gml` laden | Fläche in der Antarktis (~64°S, 56°W) — lon/lat mit 0–360°-Längen, erkannt und normalisiert |
+| G4 | NWS-Alaska-Karte laden (TDS8 bzw. `international/NWS_Alaska_src/.../S411_NWS_full_20260701.gml`) | Alaska/Beringmeer, Flächen **zusammenhängend** über die Datumsgrenze |
+
+Danach die Funktions-Checkliste:
 
 | # | Test | Soll |
 |---|---|---|
@@ -131,13 +159,29 @@ bleiben erhalten).
 | 11 | *Options → Display → Advanced → OpenGL* umschalten, Tests 1+4 wiederholen | beide Rendering-Pfade (GL und Nicht-GL) zeigen dasselbe Bild; im Nicht-GL-Modus sind Füllungen ebenfalls halbtransparent |
 | 12 | Geteilter Bildschirm (zweites Chart-Fenster) | Overlay erscheint in beiden Canvases |
 | 13 | Steuerdialog → **Display mode** auf *Stage of development* | Flächen färben nach Entwicklungsstadium (Violett-/Grüntöne) statt Konzentration; Festeis in diesem Modus nach SOD, nicht grau |
-| 14 | **Display mode** *Navigational* + **Vessel ice class** *IA Super* | Ampel: grün=sicher, gelb=Vorsicht, rot=gefährlich; höhere Eisklasse verschiebt die Grenze (mehr grün/gelb). 10/10-Eis bleibt für jede Klasse rot |
-| 15 | **Colour palette** *Dusk* / *Night* durchschalten | Füllungen abgedunkelt; Linien im Night-Modus hell/sichtbar |
-| 16 | Vergleich mit Web-Viewer (Portal → Viewer, gleicher Datensatz, gleicher Modus/Palette/Eisklasse) | identische Portrayal — Plugin und Viewer nutzen dieselbe Logik/Farbtabelle |
+| 14 | **Display mode** *Navigational* + **Vessel ice class** durchschalten | Ampel nach der Solltabelle unten; höhere Eisklasse verschiebt die Grenze (mehr grün). 10/10-Eis bleibt für jede Klasse rot |
+| 15 | **Colour palette** *Dusk* / *Night* durchschalten | Füllungen abgedunkelt; Linien im Night-Modus hell/sichtbar; Legende dimmt mit |
+| 16 | Vergleich mit Web-Viewer (Portal → Viewer, gleicher Datensatz, gleicher Modus/Palette/Eisklasse) | identische Portrayal — Plugin, Viewer und die normative `rules/main.xsl` nutzen seit v0.4.0 nachweislich dieselben Tabellen (CI-Paritätschecks in beiden Repos) |
+| 17 | Klick auf eine Eisfläche (ohne Ziehen) | Feature-Report: Featuretyp, Datensatz, alle Attribute; `totalConcentration`/`stageOfDevelopment` mit Klartext-Label; Klick auf freie See: nichts; Pannen unverändert |
+| 18 | Zweiten Datensatz laden, Checkboxen der Liste umschalten | jeweils nur die angehakten Datensätze werden gezeichnet; *Remove* entfernt einzeln; *Zoom to data* springt zum markierten bzw. zu allen sichtbaren |
+| 19 | **Fill opacity** schieben, OpenCPN neu starten | Deckkraft ändert sich live und ist nach Neustart erhalten |
+| 20 | Robustheit: Kopie von `tests/fixtures/v1_latlon.gml`, `iceact`-Wert auf `9+` oder leer setzen, laden | Fläche **grau „Unknown"** in Nav- und Konzentrations-Modus — nicht rot, nicht grün „eisfrei" |
 
-**Bekannte Grenzen (v0.3.0, kein Fehler):** keine Pick-Reports beim Klick auf
-Eisflächen, Punkt-Features als generische Dreiecke statt Annex-C-Symbole,
-Linien-Strichmuster sind Näherungen, kein Eisbericht-Textfenster.
+**Solltabelle Navigational-Ampel** (Bewertung der maximalen Bedeckung in
+Zehnteln; Entscheidung dokumentiert im seaice-Repo, `docs/DECISIONS.md` #17):
+
+| ct | keine Klasse | IB / IC (PC6–7) | IA (PC4–5) | IA Super (PC1–3) |
+|---|---|---|---|---|
+| 46 (4–6/10) | gelb | gelb | **grün** | grün |
+| 80 (8/10) | gelb | gelb | gelb | **grün** |
+| 90 (9/10) | rot | rot | rot | **gelb** |
+| 92 (10/10) | rot | rot | rot | rot |
+| 02 (bergy water) | überall hellblau *Open water / bergy water* — nie „Safe (ice free)" | | | |
+
+**Bekannte Grenzen (v0.4.0, kein Fehler):** Punkt-Features als generische
+Dreiecke statt Annex-C-Symbole, Linien-Strichmuster sind Näherungen; bei
+geteiltem Bildschirm nutzt der Feature-Report den zuletzt gezeichneten
+Canvas-Viewport.
 
 ---
 
