@@ -218,8 +218,9 @@ int main(int argc, char **argv) {
                            "") == S411SodToken("95"),
           "stage-of-development mode ignores fast-ice override");
 
-    // ice-class traffic light: 7/10 (ct 78) is red without a class, but only
-    // amber for an IA Super vessel (amber threshold 10/10)
+    // ice-class traffic light (docs/DECISIONS.md in the spec repo): green
+    // below the class's amber threshold, red from 9/10 for every class
+    // except IA Super (amber at 9/10, red only at full cover)
     Check(S411NavToken("78", "") == "ICEC46",
           "nav: 7/10, no class -> caution");
     Check(S411NavToken("78", "IASuper") == "ICEC13",
@@ -227,6 +228,20 @@ int main(int argc, char **argv) {
     Check(S411NavToken("92", "IASuper") == "ICEC9T",
           "nav: 10/10, IA Super -> hazardous");
     Check(S411NavToken("98", "IA") == "ICEFRE", "nav: ice free -> safe");
+    Check(S411NavToken("90", "IASuper") == "ICEC46",
+          "nav: 9/10, IA Super -> caution (not green, not red)");
+    Check(S411NavToken("80", "IASuper") == "ICEC13",
+          "nav: 8/10, IA Super -> below limit");
+    Check(S411NavToken("79", "") == "ICEC9T",
+          "nav: 7-9/10, no class -> hazardous (range reaches 9/10)");
+    Check(S411NavToken("02", "IA") == "ICEOPW",
+          "nav: bergy water -> own token, never 'safe'");
+    Check(S411NavToken("9+", "IA") == "ICEUNK",
+          "nav: non-IOC notation '9+' -> unknown");
+    Check(S411CtMaxTenths(" 98") == -1,
+          "maxTenths: padded code -> unknown, not full cover");
+    Check(S411CtMaxTenths("95") == -1,
+          "maxTenths: undefined 9x code -> unknown");
 
     // palettes dim the fill; night keeps line foreground visible
     S411Rgb day = S411TokenRgb("ICEC9T", S411Palette::Day);

@@ -52,6 +52,7 @@ public:
         break;
       case S411Mode::Navigational:
         m_rows = {{"ICEFRE", "Safe (ice free)"},
+                  {"ICEOPW", "Open water / bergy water"},
                   {"ICEC13", "Below ice-class limit"},
                   {"ICEC46", "Caution"},
                   {"ICEC9T", "Hazardous"},
@@ -143,7 +144,7 @@ public:
     m_class->Append("No ice class");
     m_class->Append("IC / PC7");
     m_class->Append("IB / PC6");
-    m_class->Append("IA / PC5");
+    m_class->Append("IA / PC4-5");
     m_class->Append("IA Super / PC1-3");
     grid->Add(m_class, 1, wxEXPAND);
 

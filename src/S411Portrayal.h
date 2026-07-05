@@ -129,32 +129,39 @@ inline wxString S411SodLabel(const wxString &sod) {
 
 // concentration code -> maximum tenths covered (S-411 ctMaxTenths).
 // Two-digit range code "lo hi": upper bound = hi tenths, except hi==0 means
-// exactly lo, and the 9x codes (90=9/10, 91=9+/10, 92=10/10) which top out at
-// 9 resp. 10 tenths.
+// exactly lo, and 91 (9+/10), 92 (10/10) and the x1 range codes which top
+// out at 10 tenths. Values outside the IOC v5.2 code table ("", "9+",
+// 93-97, padded text) yield -1 = unknown. Same table as the web viewer,
+// rules/main.xsl and tools/validate.py CT_MAX (see docs/DECISIONS.md).
 inline int S411CtMaxTenths(const wxString &ct) {
   if (ct == "99" || ct.IsEmpty()) return -1;              // unknown
   if (ct == "98" || ct == "01" || ct == "02") return 0;   // ice free / open
+  if (S411ConcToken(ct) == "ICEUNK") return -1;           // not an IOC code
   long n;
-  if (!ct.ToLong(&n)) return -1;
-  if (n < 10) return 0;
+  if (!ct.ToLong(&n)) return -1;        // unreachable for the closed enum
   long lo = n / 10, hi = n % 10;
   if (hi == 0) return (int)lo;          // 90 -> 9
-  if (lo == 9) return 10;               // 91, 92 -> full cover
-  if (hi == 1) return 10;               // e.g. 81 -> up to 10
+  if (lo == 9) return 10;               // 91, 92 -> full cover (98 above)
+  if (hi == 1) return 10;               // 81 (8-10/10), the only other x1
   return (int)hi;                        // 46 -> 6
 }
 
-// ice-class traffic light (S-411 navToken); iceClass: "", IC, IB, IA, IASuper
+// ice-class traffic light (S-411 navToken); iceClass: "", IC, IB, IA,
+// IASuper. Green below the class's amber threshold, red from 9/10 for every
+// class except IA Super (red only at full cover, 9/10 is amber). Bergy
+// water keeps its own token - bergs may be about, it is never "safe".
 inline wxString S411NavToken(const wxString &ct, const wxString &iceClass) {
+  if (ct == "02") return "ICEOPW";
   const int v = S411CtMaxTenths(ct);
   if (v < 0) return "ICEUNK";
   int amber = 1;  // no ice class: any ice is amber
-  if (iceClass == "IASuper") amber = 10;
+  if (iceClass == "IASuper") amber = 9;
   else if (iceClass == "IA") amber = 8;
   else if (iceClass == "IB" || iceClass == "IC") amber = 5;
+  const int red = iceClass == "IASuper" ? 10 : 9;
   if (v < 1) return "ICEFRE";
   if (v < amber) return "ICEC13";
-  if (v < 9) return "ICEC46";
+  if (v < red) return "ICEC46";
   return "ICEC9T";
 }
 
