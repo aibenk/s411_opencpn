@@ -11,7 +11,7 @@
 #             OpenCPN's Options -> Plugins -> "Import plugin..." (preferred)
 
 param([switch]$Install, [switch]$Package)
-$Version = "0.4.0"
+$Version = "0.5.0"
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 $sdk = "$repo\sdk"
@@ -43,7 +43,7 @@ if (-not (Test-Path "$sdk\opencpn.lib")) {
 
 # 3. compile + link (Win32, /MD, wx DLL build - matches OpenCPN's vc14x DLLs)
 New-Item -ItemType Directory -Force "$repo\winbuild" | Out-Null
-cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /nologo /c /std:c++14 /EHsc /MD /O2 /DWIN32 /D_WINDOWS /D__WXMSW__ /DWXUSINGDLL /D_UNICODE /DUNICODE /Isdk\wx\include /Isdk\wx\lib\vc14x_dll\mswu /Iapi /Isrc /Fowinbuild\ src\s411_pi.cpp src\S411Data.cpp src\S411Tess.cpp && link /nologo /DLL /MACHINE:X86 /OUT:winbuild\s411_pi.dll winbuild\s411_pi.obj winbuild\S411Data.obj winbuild\S411Tess.obj /LIBPATH:sdk\wx\lib\vc14x_dll sdk\opencpn.lib wxmsw32u_core.lib wxbase32u.lib wxbase32u_xml.lib wxmsw32u_gl.lib wxmsw32u_aui.lib wxmsw32u_adv.lib glu32.lib opengl32.lib comctl32.lib rpcrt4.lib"
+cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /nologo /c /std:c++14 /EHsc /MD /O2 /DWIN32 /D_WINDOWS /D__WXMSW__ /DWXUSINGDLL /D_UNICODE /DUNICODE /Isdk\wx\include /Isdk\wx\lib\vc14x_dll\mswu /Iapi /Isrc /Fowinbuild\ src\s411_pi.cpp src\S411Data.cpp src\S411Tess.cpp src\S411Router.cpp src\S411Boundary.cpp && link /nologo /DLL /MACHINE:X86 /OUT:winbuild\s411_pi.dll winbuild\s411_pi.obj winbuild\S411Data.obj winbuild\S411Tess.obj winbuild\S411Router.obj winbuild\S411Boundary.obj /LIBPATH:sdk\wx\lib\vc14x_dll sdk\opencpn.lib wxmsw32u_core.lib wxbase32u.lib wxbase32u_xml.lib wxmsw32u_gl.lib wxmsw32u_aui.lib wxmsw32u_adv.lib glu32.lib opengl32.lib comctl32.lib rpcrt4.lib"
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 Write-Host "OK: winbuild\s411_pi.dll"
 

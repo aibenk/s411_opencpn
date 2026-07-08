@@ -27,6 +27,26 @@ The portrayal (colours, line styles, classification rules) is ported verbatim
 from the machine-readable model of the
 [S-411 Edition 2.0.0 specification project](https://github.com/aibenk/s411).
 
+## Ice-aware routing
+
+OpenCPN's Weather Routing plugin has **no sea-ice awareness** (it only knows
+wind/current and hard exclusion boundaries), so s411_pi provides routing two
+ways:
+
+- **Built-in ice router** — set a start and end position by clicking the chart,
+  then *Compute ice route*. An A\* search over a cost raster derived from the
+  loaded charts finds a path that treats **hazardous ice as impassable** and
+  **caution ice as a penalty** *for the selected vessel ice class*, avoids
+  land (via OpenCPN's GSHHS coastline), and is added straight to OpenCPN's
+  route manager. Optionally treat caution ice as impassable too. Distance and
+  the miles spent in caution ice are reported.
+- **Export ice no-go zones** — with the [ocpn_draw_pi](https://github.com/jongough/ocpn_draw_pi)
+  plugin installed, *Export no-go zones* turns the hazardous (and optionally
+  caution) ice into **Exclusion boundaries**. The **Weather Routing** plugin's
+  *Detect Boundary* option then avoids them, so weather routing becomes
+  ice-aware. Re-export is idempotent (only the plugin's own boundaries are
+  replaced; user boundaries are never touched).
+
 ## Exchange sets & supported inputs
 
 The file dialog accepts, in any mix:

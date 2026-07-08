@@ -19,6 +19,7 @@
 #include "ocpn_plugin.h"
 #include "S411Data.h"
 #include "S411Portrayal.h"
+#include "S411Router.h"
 
 class S411CtrlDialog;
 
@@ -32,7 +33,7 @@ public:
   int GetAPIVersionMajor() override { return 1; }
   int GetAPIVersionMinor() override { return 16; }
   int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 4; }
+  int GetPlugInVersionMinor() override { return 5; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;
@@ -54,6 +55,9 @@ public:
   // feature picking: plain click (no drag) -> attribute report
   bool MouseEventHook(wxMouseEvent &event) override;
 
+  // inter-plugin messaging (ocpn_draw_pi handshake + boundary responses)
+  void SetPluginMessage(wxString &message_id, wxString &message_body) override;
+
   // called back by the control dialog
   void LoadFiles();
   void ClearData();
@@ -65,6 +69,24 @@ public:
   /** Jump the chart to dataset `idx`, or to the union of all visible
    *  datasets when idx < 0. */
   void ZoomToData(int idx);
+
+  // --- routing (called back by the routing panel) ------------------------
+  /** Arm map-click capture for start (which==0) or end (which==1). */
+  void BeginPickPoint(int which);
+  bool HaveStart() const { return m_haveStart; }
+  bool HaveEnd() const { return m_haveEnd; }
+  wxString StartLabel() const;
+  wxString EndLabel() const;
+  /** Compute the ice route and add it to OpenCPN. Returns a status string;
+   *  ok is set true on success. */
+  wxString ComputeRoute(bool &ok);
+  /** (Re)export ice hazard zones as ocpn_draw boundaries. Returns a status
+   *  string. */
+  wxString ExportHazards();
+  /** Delete every boundary this plugin created. */
+  void ClearHazards();
+  bool OcpnDrawAvailable() const { return m_odAvailable; }
+  S411RouteParams &RouteParams() { return m_route; }
 
   // portrayal state (read/written by the control dialog)
   bool m_show = false;
@@ -83,6 +105,9 @@ private:
   void ShowPickReport(const std::vector<S411Hit> &hits, double lat,
                       double lon);
   void JumpToBox(double latMin, double latMax, double lonMin, double lonMax);
+  // ocpn_draw messaging
+  wxString SendOcpnDraw(const wxString &json);   // returns the reply body
+  void DeleteOurBoundaries();
 
   wxBitmap m_icon;
   int m_toolId = -1;
@@ -95,4 +120,14 @@ private:
   bool m_haveVp = false;
   wxPoint m_downPos;                   // click-vs-drag discrimination
   bool m_downValid = false;
+
+  // routing state
+  S411RouteParams m_route;
+  S411Pos m_start{0, 0}, m_end{0, 0};
+  bool m_haveStart = false, m_haveEnd = false;
+  int m_pickMode = 0;                  // 0 none, 1 start, 2 end
+  wxString m_lastRouteGuid;
+  bool m_odAvailable = false;
+  wxString m_odReply;                  // reply captured during SendOcpnDraw
+  bool m_capturingReply = false;
 };

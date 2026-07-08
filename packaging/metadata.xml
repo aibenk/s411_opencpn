@@ -1,6 +1,6 @@
 <plugin version="1">
   <name>s411_pi</name>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
   <release>1</release>
   <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
   <api-version>1.16</api-version>
@@ -10,7 +10,9 @@
   <description>Loads S-411 Ice Information datasets (Edition 2.0.0/1.x GML,
 exchange sets, zips) and renders them with the WMO ice chart colour code.
 Switchable display mode (concentration / stage of development / ice-class
-traffic light), vessel ice class and day/dusk/night palette.</description>
+traffic light), vessel ice class and day/dusk/night palette. Computes
+ice-aware routes (A* by vessel ice class) and exports ice no-go zones as
+ocpn_draw boundaries for the Weather Routing plugin.</description>
   <target>msvc-wx32</target>
   <target-version>10</target-version>
   <target-arch>x86</target-arch>

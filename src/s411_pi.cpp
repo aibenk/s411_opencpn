@@ -6,6 +6,7 @@
  ***************************************************************************/
 #include "s411_pi.h"
 
+#include <wx/checkbox.h>
 #include <wx/checklst.h>
 #include <wx/choice.h>
 #include <wx/dcmemory.h>
@@ -16,9 +17,17 @@
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/slider.h>
+#include <wx/statline.h>
 #include <wx/stattext.h>
 
 #include <cmath>
+
+#include "S411Boundary.h"
+
+// opencpn.lib (generated from the installed exe) does not export the
+// out-of-line methods of Plugin_WaypointList, so provide them here.
+#include <wx/listimpl.cpp>  // NOLINT - wx idiom for WX_DEFINE_LIST
+WX_DEFINE_LIST(Plugin_WaypointList);
 
 #ifdef __WXMSW__
 #include <windows.h>
@@ -166,6 +175,54 @@ public:
     m_legend = new S411LegendPanel(this, pi);
     s->Add(m_legend, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
 
+    // --- ice routing section -------------------------------------------
+    s->Add(new wxStaticLine(this), 0, wxEXPAND | wxALL, b);
+    s->Add(new wxStaticText(this, wxID_ANY,
+                            "Ice routing (uses the 'Vessel ice class' above)"),
+           0, wxLEFT | wxRIGHT | wxTOP, b);
+
+    auto *rg = new wxFlexGridSizer(2, 3, b, b);
+    rg->AddGrowableCol(1, 1);
+    rg->Add(new wxStaticText(this, wxID_ANY, "Start"), 0,
+            wxALIGN_CENTRE_VERTICAL);
+    m_startLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
+    rg->Add(m_startLbl, 1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
+    auto *pickS = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
+                               wxSize(56, -1));
+    rg->Add(pickS, 0);
+    rg->Add(new wxStaticText(this, wxID_ANY, "End"), 0,
+            wxALIGN_CENTRE_VERTICAL);
+    m_endLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
+    rg->Add(m_endLbl, 1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
+    auto *pickE = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
+                               wxSize(56, -1));
+    rg->Add(pickE, 0);
+    s->Add(rg, 0, wxEXPAND | wxALL, b);
+
+    m_avoidCaution = new wxCheckBox(
+        this, wxID_ANY, "Avoid caution ice too (not just hazardous)");
+    s->Add(m_avoidCaution, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+
+    auto *rb = new wxBoxSizer(wxHORIZONTAL);
+    auto *compute = new wxButton(this, wxID_ANY, "Compute ice route");
+    rb->Add(compute, 0, wxRIGHT, b);
+    m_export = new wxButton(this, wxID_ANY, "Export no-go zones");
+    rb->Add(m_export, 0);
+    s->Add(rb, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    m_routeStatus = new wxStaticText(this, wxID_ANY, "");
+    m_routeStatus->Wrap(320);
+    s->Add(m_routeStatus, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
+
+    pickS->Bind(wxEVT_BUTTON,
+                [this](wxCommandEvent &) { m_pi->BeginPickPoint(0); });
+    pickE->Bind(wxEVT_BUTTON,
+                [this](wxCommandEvent &) { m_pi->BeginPickPoint(1); });
+    m_avoidCaution->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) {
+      m_pi->RouteParams().avoidCaution = m_avoidCaution->GetValue();
+    });
+    compute->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnCompute, this);
+    m_export->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnExport, this);
+
     auto *close = new wxButton(this, wxID_CLOSE, "Close");
     s->Add(close, 0, wxALIGN_RIGHT | wxALL, b);
 
@@ -199,6 +256,16 @@ public:
     m_pal->SetSelection((int)m_pi->m_palette);
     m_opacity->SetValue(wxMax(10, wxMin(100, m_pi->m_alpha * 100 / 255)));
     m_class->Enable(m_pi->m_mode == S411Mode::Navigational);
+    if (m_startLbl) m_startLbl->SetLabel(m_pi->StartLabel());
+    if (m_endLbl) m_endLbl->SetLabel(m_pi->EndLabel());
+    if (m_avoidCaution)
+      m_avoidCaution->SetValue(m_pi->RouteParams().avoidCaution);
+    if (m_export)
+      m_export->SetToolTip(
+          m_pi->OcpnDrawAvailable()
+              ? "Export ice no-go zones as ocpn_draw boundaries for the "
+                "Weather Routing plugin."
+              : "Requires the ocpn_draw_pi plugin (not detected).");
     m_legend->Rebuild();
     Layout();
     Fit();
@@ -274,6 +341,19 @@ private:
     UpdateStatus();
     m_pi->Refresh();
   }
+  void OnCompute(wxCommandEvent &) {
+    bool ok = false;
+    m_routeStatus->SetLabel(m_pi->ComputeRoute(ok));
+    m_routeStatus->Wrap(320);
+    Layout();
+    Fit();
+  }
+  void OnExport(wxCommandEvent &) {
+    m_routeStatus->SetLabel(m_pi->ExportHazards());
+    m_routeStatus->Wrap(320);
+    Layout();
+    Fit();
+  }
 
   s411_pi *m_pi;
   wxCheckBox *m_show;
@@ -282,6 +362,10 @@ private:
   wxStaticText *m_status;
   wxCheckListBox *m_list;
   S411LegendPanel *m_legend;
+  wxStaticText *m_startLbl = nullptr, *m_endLbl = nullptr,
+               *m_routeStatus = nullptr;
+  wxCheckBox *m_avoidCaution = nullptr;
+  wxButton *m_export = nullptr;
 };
 
 // ===========================================================================
@@ -347,9 +431,14 @@ int s411_pi::Init(void) {
   m_toolId = InsertPlugInTool("", &m_icon, &m_icon, wxITEM_CHECK, "S-411 ice",
                               "S-411 ice information: load and portrayal",
                               nullptr, -1, 0, this);
+  // ocpn_draw_pi detection happens later, not here: this plugin is not yet
+  // registered for messaging until Init() RETURNS the capability flags, so a
+  // handshake now could not receive a reply. Availability is learned from the
+  // OCPN_DRAW_PI_READY_FOR_REQUESTS broadcast (SetPluginMessage) and from an
+  // on-demand Version handshake in ExportHazards().
   return WANTS_OVERLAY_CALLBACK | WANTS_OPENGL_OVERLAY_CALLBACK |
          INSTALLS_TOOLBAR_TOOL | WANTS_TOOLBAR_CALLBACK | WANTS_PREFERENCES |
-         WANTS_MOUSE_EVENTS;
+         WANTS_MOUSE_EVENTS | WANTS_PLUGIN_MESSAGING;
 }
 
 bool s411_pi::DeInit(void) {
@@ -481,7 +570,9 @@ void s411_pi::ShowPreferencesDialog(wxWindow *parent) { ShowControl(); }
 // feature picking: a plain click (no drag) on the overlay opens a report
 // ---------------------------------------------------------------------------
 bool s411_pi::MouseEventHook(wxMouseEvent &ev) {
-  if (!m_show || m_data.empty() || !m_haveVp) return false;
+  if (!m_haveVp) return false;
+  const bool picking = m_pickMode != 0;
+  if (!m_show && !picking) return false;
   if (ev.LeftDown()) {
     m_downPos = ev.GetPosition();
     m_downValid = true;
@@ -492,6 +583,19 @@ bool s411_pi::MouseEventHook(wxMouseEvent &ev) {
   const wxPoint up = ev.GetPosition();
   if (abs(up.x - m_downPos.x) > 3 || abs(up.y - m_downPos.y) > 3)
     return false;  // that was a drag/pan, not a click
+
+  // routing: a click sets the armed start/end position
+  if (picking) {
+    double plat, plon;
+    GetCanvasLLPix(&m_lastVp, up, &plat, &plon);
+    if (m_pickMode == 1) { m_start = {plat, plon}; m_haveStart = true; }
+    else { m_end = {plat, plon}; m_haveEnd = true; }
+    m_pickMode = 0;
+    if (m_dialog) m_dialog->FromState();  // refresh the routing labels
+    return true;  // consumed
+  }
+
+  if (m_data.empty()) return false;
   double lat, lon, latR, lonR;
   GetCanvasLLPix(&m_lastVp, up, &lat, &lon);
   GetCanvasLLPix(&m_lastVp, wxPoint(up.x + 8, up.y), &latR, &lonR);
@@ -552,6 +656,142 @@ void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
 }
 
 // ---------------------------------------------------------------------------
+// inter-plugin messaging (ocpn_draw_pi)
+// ---------------------------------------------------------------------------
+void s411_pi::SetPluginMessage(wxString &id, wxString &body) {
+  if (id == "OCPN_DRAW_PI_READY_FOR_REQUESTS") {
+    m_odAvailable = body.Upper().Contains("TRUE");
+    return;
+  }
+  // synchronous reply to one of our requests (delivered on our Source id)
+  if (id == S411_OD_SOURCE && m_capturingReply) m_odReply = body;
+}
+
+wxString s411_pi::SendOcpnDraw(const wxString &json) {
+  wxString tgt = S411_OD_TARGET, body = json;
+  m_odReply.Clear();
+  m_capturingReply = true;
+  SendPluginMessage(tgt, body);  // reply arrives synchronously in SetPluginMessage
+  m_capturingReply = false;
+  return m_odReply;
+}
+
+void s411_pi::DeleteOurBoundaries() {
+  const wxString info = SendOcpnDraw(S411BuildBoundaryInfoRequest());
+  std::vector<wxString> guids;
+  S411JsonOurBoundaryGuids(info, guids);
+  for (const auto &g : guids) SendOcpnDraw(S411BuildDeleteBoundary(g));
+}
+
+// ---------------------------------------------------------------------------
+// routing
+// ---------------------------------------------------------------------------
+static wxString PosLabel(const S411Pos &p) {
+  return wxString::Format("%.4f°%s  %.4f°%s", std::fabs(p.lat),
+                          p.lat >= 0 ? "N" : "S", std::fabs(p.lon),
+                          p.lon >= 0 ? "E" : "W");
+}
+wxString s411_pi::StartLabel() const {
+  return m_haveStart ? PosLabel(m_start) : "(click the map)";
+}
+wxString s411_pi::EndLabel() const {
+  return m_haveEnd ? PosLabel(m_end) : "(click the map)";
+}
+
+void s411_pi::BeginPickPoint(int which) {
+  m_pickMode = which == 0 ? 1 : 2;
+  wxMessageBox(wxString::Format("Click the %s position on the chart.",
+                                which == 0 ? "START" : "END"),
+               "S-411 route", wxOK | wxICON_INFORMATION,
+               GetOCPNCanvasWindow());
+}
+
+wxString s411_pi::ComputeRoute(bool &ok) {
+  ok = false;
+  if (!m_haveStart || !m_haveEnd)
+    return "Set a start and an end position first (click the map).";
+  bool anyVisible = false;
+  for (const auto &d : m_data) anyVisible |= d.visible && !d.features.empty();
+  if (!anyVisible)
+    return "No ice data loaded - load an S-411 dataset before routing.";
+
+  m_route.iceClass = m_iceClass;
+  S411RouteResult r;
+  const S411LandFn land = [](double la1, double lo1, double la2, double lo2) {
+    return PlugIn_GSHHS_CrossesLand(la1, lo1, la2, lo2);
+  };
+  if (!S411ComputeIceRoute(m_data, m_start, m_end, m_route, land, r))
+    return "No route: " + r.error;
+
+  // hand the polyline to OpenCPN's route manager
+  PlugIn_Route route;  // its ctor allocates pWaypointList; its dtor frees it
+  route.m_NameString = wxString::Format(
+      "S-411 ice route (%s)",
+      m_iceClass.IsEmpty() ? "no ice class" : m_iceClass);
+  route.m_StartString = "S-411 start";
+  route.m_EndString = "S-411 end";
+  route.m_GUID = GetNewGUID();
+  for (size_t i = 0; i < r.waypoints.size(); i++) {
+    const bool ends = (i == 0 || i + 1 == r.waypoints.size());
+    auto *wp = new PlugIn_Waypoint(
+        r.waypoints[i].lat, r.waypoints[i].lon,
+        ends ? "activepoint" : "diamond",
+        i == 0 ? "Start"
+               : (i + 1 == r.waypoints.size()
+                      ? "End"
+                      : wxString::Format("wp%zu", i)),
+        GetNewGUID());
+    route.pWaypointList->Append(wp);
+  }
+  const bool added = AddPlugInRoute(&route, true);
+  // AddPlugInRoute copies the data into OpenCPN's own route objects, so free
+  // the PlugIn_Waypoint objects we allocated (the list has auto-delete off;
+  // ~PlugIn_Route frees the list itself - do not delete it here)
+  for (auto node = route.pWaypointList->GetFirst(); node;
+       node = node->GetNext())
+    delete node->GetData();
+  route.pWaypointList->Clear();
+  if (!added) return "OpenCPN refused to add the route.";
+  m_lastRouteGuid = route.m_GUID;
+  ok = true;
+  return wxString::Format(
+      "Route added: %.0f NM total, %.0f NM through caution ice, %zu legs.",
+      r.distanceNm, r.cautionNm, r.waypoints.size() - 1);
+}
+
+wxString s411_pi::ExportHazards() {
+  // refresh availability (ocpn_draw may have started after us)
+  if (!m_odAvailable) {
+    if (SendOcpnDraw(S411BuildVersionRequest()).Find("\"Major\"") != wxNOT_FOUND)
+      m_odAvailable = true;
+  }
+  if (!m_odAvailable)
+    return "ocpn_draw_pi is not available - install and enable it to export "
+           "ice no-go zones for the Weather Routing plugin.";
+
+  DeleteOurBoundaries();  // idempotent re-export
+
+  std::vector<S411HazardZone> zones;
+  S411ExtractHazards(m_data, m_iceClass, m_route.avoidCaution, 60, zones);
+  if (zones.empty())
+    return "No hazardous ice zones for this ice class - nothing to export.";
+
+  size_t created = 0, n = 0;
+  for (const auto &z : zones) {
+    const wxString reply =
+        SendOcpnDraw(S411BuildCreateBoundary(z, wxString::Format("ice-%zu", n++)));
+    if (S411JsonCreated(reply)) created++;
+  }
+  return wxString::Format(
+      "Exported %zu of %zu ice no-go zone(s) as ocpn_draw boundaries.\n"
+      "Enable 'Detect Boundary' in the Weather Routing configuration to "
+      "avoid them.",
+      created, zones.size());
+}
+
+void s411_pi::ClearHazards() { DeleteOurBoundaries(); }
+
+// ---------------------------------------------------------------------------
 // configuration persistence
 // ---------------------------------------------------------------------------
 void s411_pi::LoadConfig() {
@@ -565,6 +805,12 @@ void s411_pi::LoadConfig() {
   m_lastDir = cfg->Read("LastDir", wxString(""));
   v = cfg->Read("FillAlpha", 170L);
   m_alpha = (int)wxMax(26, wxMin(255, v));
+  bool avoid = false;
+  cfg->Read("RouteAvoidCaution", &avoid, false);
+  m_route.avoidCaution = avoid;
+  double pen = 4.0;
+  cfg->Read("RouteCautionPenalty", &pen, 4.0);
+  m_route.cautionPenalty = wxMax(1.0, wxMin(50.0, pen));
 }
 
 void s411_pi::SaveConfig() {
@@ -576,6 +822,8 @@ void s411_pi::SaveConfig() {
   cfg->Write("IceClass", m_iceClass);
   cfg->Write("LastDir", m_lastDir);
   cfg->Write("FillAlpha", (long)m_alpha);
+  cfg->Write("RouteAvoidCaution", m_route.avoidCaution);
+  cfg->Write("RouteCautionPenalty", m_route.cautionPenalty);
   cfg->Flush();
 }
 

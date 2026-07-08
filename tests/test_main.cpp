@@ -16,10 +16,16 @@
 #include <cmath>
 #include <cstdio>
 
+#include "S411Boundary.h"
 #include "S411Data.h"
 #include "S411Portrayal.h"
+#include "S411Router.h"
 
 static int g_fail = 0;
+
+static bool Contains(const wxString &h, const char *n) {
+  return h.Find(n) != wxNOT_FOUND;
+}
 
 static void Check(bool ok, const char *what) {
   std::printf("%s  %s\n", ok ? "PASS" : "FAIL", what);
@@ -250,6 +256,273 @@ int main(int argc, char **argv) {
     Check(night.r < day.r, "night palette dims the fill");
     S411Rgb ln = S411TokenRgb("ICELIN", S411Palette::Night);
     Check(ln.r > 200, "night ICELIN stays light (visible lines)");
+  }
+
+  // --- 9: ice-aware router -------------------------------------------------
+  {
+    // helper: build a rectangular area feature with a given concentration
+    auto box = [](double la, double lA, double lo, double lO,
+                  const char *ct) {
+      S411Feature f;
+      f.kind = S411Kind::Area;
+      f.type = "SeaIce";
+      f.totalConcentration = ct;
+      f.rings.push_back({{la, lo}, {la, lO}, {lA, lO}, {lA, lo}, {la, lo}});
+      f.latMin = la; f.latMax = lA; f.lonMin = lo; f.lonMax = lO;
+      return f;
+    };
+    auto dataset = [](std::vector<S411Feature> feats) {
+      std::vector<S411Dataset> d(1);
+      d[0].title = "synthetic";
+      d[0].visible = true;
+      d[0].features = std::move(feats);
+      return d;
+    };
+
+    S411RouteParams pr;
+    pr.iceClass = "";  // no ice class: 9+/10 is hazardous, lower is caution
+    S411LandFn noLand;
+
+    // (a) a solid 10/10 barrier across the corridor with a clear gap: the
+    //     route must reach the far side and pass THROUGH the gap
+    {
+      // barrier spans lon 9..11 for lat 0..2 and lat 3..5, gap at lat 2..3
+      auto data = dataset({box(0.0, 2.0, 9.0, 11.0, "92"),
+                           box(3.0, 5.0, 9.0, 11.0, "92")});
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {2.5, 5.0}, {2.5, 15.0}, pr,
+                                    noLand, r);
+      Check(ok, "router: finds a path through the ice gap");
+      bool clearedFar = !r.waypoints.empty() &&
+                        r.waypoints.back().lon > 14.0;
+      Check(clearedFar, "router: path reaches the destination side");
+      // every waypoint must avoid the 10/10 boxes (blocked)
+      bool avoidsBlocked = true;
+      for (const auto &w : r.waypoints)
+        if (w.lon > 9.2 && w.lon < 10.8 &&
+            ((w.lat > 0.2 && w.lat < 1.8) || (w.lat > 3.2 && w.lat < 4.8)))
+          avoidsBlocked = false;
+      Check(avoidsBlocked, "router: path stays out of 10/10 ice");
+    }
+
+    // (a2) a diagonal wall of blocked cells must not be crossed at a corner
+    //      (review finding #1: 8-connected corner cutting)
+    {
+      // a staircase of 10/10 boxes on the anti-diagonal from SW to NE
+      std::vector<S411Feature> feats;
+      for (int k = 0; k < 8; k++)
+        feats.push_back(box(k * 1.0, k * 1.0 + 1.0, 13.0 - k * 1.0,
+                            14.0 - k * 1.0, "92"));
+      auto data = dataset(feats);
+      // start south of the wall, end north of it, on opposite corners
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.5, 5.0}, {7.5, 16.0}, pr, noLand,
+                                    r);
+      // whether or not a path exists, no waypoint segment may pass through a
+      // blocked box; sample the polyline densely and check
+      bool through = false;
+      for (size_t i = 0; ok && i + 1 < r.waypoints.size(); i++)
+        for (int s = 0; s <= 40; s++) {
+          const double t = s / 40.0;
+          const double la = r.waypoints[i].lat +
+                            (r.waypoints[i + 1].lat - r.waypoints[i].lat) * t;
+          double lo = r.waypoints[i].lon +
+                      (r.waypoints[i + 1].lon - r.waypoints[i].lon) * t;
+          for (int k = 0; k < 8; k++)
+            if (la > k * 1.0 + 0.05 && la < k * 1.0 + 0.95 &&
+                lo > 13.0 - k * 1.0 + 0.05 && lo < 14.0 - k * 1.0 - 0.05)
+              through = true;
+        }
+      Check(!through, "router: no diagonal corner-cut through blocked ice");
+    }
+
+    // (b) a barrier that fully seals the corridor -> no route
+    {
+      auto data = dataset({box(-10.0, 10.0, 9.0, 11.0, "92")});
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.0, 5.0}, {0.0, 15.0}, pr,
+                                    noLand, r);
+      Check(!ok, "router: reports no route when ice seals the corridor");
+      Check(!r.error.IsEmpty(), "router: gives a reason when blocked");
+    }
+
+    // (c) amber (caution) ice is passable but penalised: a detour of mild
+    //     ice is preferred when the penalty is high enough
+    {
+      // amber 5/10 block straight ahead; open water detour to the north
+      S411RouteParams p2 = pr;
+      p2.cautionPenalty = 8.0;
+      auto data = dataset({box(-0.5, 0.5, 9.0, 11.0, "50")});  // 5/10 amber
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.0, 5.0}, {0.0, 15.0}, p2,
+                                    noLand, r);
+      Check(ok, "router: routes around penalised amber ice");
+      double maxAbsLat = 0;
+      for (const auto &w : r.waypoints)
+        maxAbsLat = std::max(maxAbsLat, std::fabs(w.lat));
+      Check(maxAbsLat > 0.4,
+            "router: detours clear of the amber block (either side)");
+    }
+
+    // (d) avoidCaution makes amber impassable -> if that seals it, no route
+    {
+      S411RouteParams p3 = pr;
+      p3.avoidCaution = true;
+      p3.minMarginDeg = 0.3;  // tight corridor so the amber wall really seals
+      p3.marginFrac = 0.05;
+      auto data = dataset({box(-10.0, 10.0, 9.0, 11.0, "50")});
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.0, 9.5}, {0.0, 10.5}, p3,
+                                    noLand, r);
+      Check(!ok, "router: avoidCaution treats amber as impassable");
+    }
+
+    // (e) land avoidance: a stub that blocks a latitude band forces a detour
+    {
+      auto data = dataset({});  // no ice at all
+      S411LandFn land = [](double la1, double lo1, double la2, double lo2) {
+        // "land" occupies lat 0.4..0.6 for lon 9..11
+        auto hits = [](double la, double lo) {
+          return la > 0.4 && la < 0.6 && lo > 9.0 && lo < 11.0;
+        };
+        return hits(la1, lo1) || hits(la2, lo2);
+      };
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.5, 5.0}, {0.5, 15.0}, pr, land,
+                                    r);
+      Check(ok, "router: finds a way around a land obstruction");
+    }
+
+    // (f) hazard extraction + ring simplification
+    {
+      // a 10/10 blob with many vertices on its ring
+      S411Feature f;
+      f.kind = S411Kind::Area;
+      f.type = "SeaIce";
+      f.totalConcentration = "92";
+      std::vector<S411Pos> circle;
+      for (int i = 0; i < 400; i++) {
+        const double a = i * 2.0 * 3.14159265 / 400;
+        circle.push_back({60.0 + 0.5 * std::sin(a), 20.0 + 0.5 * std::cos(a)});
+      }
+      f.rings.push_back(circle);
+      f.latMin = 59.5; f.latMax = 60.5; f.lonMin = 19.5; f.lonMax = 20.5;
+      auto data = dataset({f});
+      std::vector<S411HazardZone> zones;
+      size_t n = S411ExtractHazards(data, "", false, 60, zones);
+      Check(n == 1, "hazard: one blocked zone extracted");
+      Check(!zones.empty() && zones[0].ring.size() <= 60,
+            "hazard: ring simplified to the vertex cap");
+      Check(!zones.empty() && zones[0].ring.size() >= 8,
+            "hazard: simplified ring keeps enough shape");
+      // caution excluded by default
+      std::vector<S411HazardZone> zones2;
+      auto amber = dataset({box(0, 1, 0, 1, "50")});
+      Check(S411ExtractHazards(amber, "", false, 60, zones2) == 0,
+            "hazard: amber excluded unless requested");
+      Check(S411ExtractHazards(amber, "", true, 60, zones2) == 1,
+            "hazard: amber included when requested");
+    }
+  }
+
+  // --- 10: ocpn_draw boundary export protocol -----------------------------
+  {
+    S411HazardZone z;
+    z.severity = S411CellState::Blocked;
+    z.source = "Baltic \"BSH\" 2025";  // embedded quotes must be escaped
+    z.ring = {{54.0, 19.0}, {54.0, 20.0}, {55.0, 20.0}, {55.0, 19.0}};
+    wxString j = S411BuildCreateBoundary(z, "ice-1");
+    Check(Contains(j, "\"Msg\":\"CreateBoundary\""),
+          "boundary: CreateBoundary message");
+    Check(Contains(j, "\"BoundaryType\":\"Exclusion\""),
+          "boundary: exported as Exclusion (WR 'do not cross')");
+    Check(Contains(j, "\"Source\":\"S411_PI\""),
+          "boundary: reply channel set");
+    Check(Contains(j, "#C80000"), "boundary: blocked ice is red");
+    Check(Contains(j, "\\\"BSH\\\""),
+          "boundary: dataset title quotes are JSON-escaped");
+    // exactly 4 points sent (ring must NOT be self-closed - ocpn_draw closes)
+    int npts = 0, from = 0;
+    while ((from = j.find("\"BoundaryPointType\"", from)) != wxNOT_FOUND) {
+      npts++;
+      from += 5;
+    }
+    Check(npts == 4, "boundary: 4 points, no duplicated closing point");
+
+    S411HazardZone amber = z;
+    amber.severity = S411CellState::Caution;
+    Check(Contains(S411BuildCreateBoundary(amber, "x"), "#FFB400"),
+          "boundary: caution ice is amber");
+
+    // delete + handshake payloads
+    Check(Contains(S411BuildDeleteBoundary("abc-123"),
+                   "\"Msg\":\"DeleteBoundary\"") &&
+              Contains(S411BuildDeleteBoundary("abc-123"), "\"GUID\":\"abc-123\""),
+          "boundary: DeleteBoundary with top-level GUID");
+    Check(Contains(S411BuildVersionRequest(), "\"Msg\":\"Version\""),
+          "boundary: version handshake request");
+
+    // response scanning
+    wxString resp =
+        "{\"Source\":\"OCPN_DRAW_PI\",\"Msg\":\"CreateBoundary\","
+        "\"Type\":\"Response\",\"MsgId\":\"ice-1\",\"Created\":true,"
+        "\"GUID\":\"11112222-3333\"}";
+    Check(S411JsonCreated(resp), "boundary: parse Created:true");
+    Check(S411JsonField(resp, "GUID") == "11112222-3333",
+          "boundary: parse generated GUID");
+    Check(S411JsonField(resp, "MsgId") == "ice-1",
+          "boundary: parse correlation id");
+
+    // enumerate our own boundaries for idempotent cleanup
+    wxString info =
+        "{\"Boundaries\":["
+        "{\"Name\":\"S-411 ice: hazardous (X)\",\"GUID\":\"g-ours-1\"},"
+        "{\"Name\":\"User no-go\",\"GUID\":\"g-user\"},"
+        "{\"Name\":\"S-411 ice: caution\",\"GUID\":\"g-ours-2\"}]}";
+    std::vector<wxString> ours;
+    size_t n = S411JsonOurBoundaryGuids(info, ours);
+    Check(n == 2, "boundary: enumerate only our tagged boundaries");
+    bool right = ours.size() == 2 && ours[0] == "g-ours-1" &&
+                 ours[1] == "g-ours-2";
+    Check(right, "boundary: user boundaries are left untouched");
+
+    // regression: an UNNAMED user boundary right after one of ours must NOT
+    // inherit our tag (review finding #4 - data loss)
+    wxString info2 =
+        "{\"Boundaries\":["
+        "{\"Name\":\"S-411 ice: hazardous\",\"GUID\":\"g-ours\"},"
+        "{\"GUID\":\"g-user-unnamed\"}]}";
+    std::vector<wxString> o2;
+    S411JsonOurBoundaryGuids(info2, o2);
+    Check(o2.size() == 1 && o2[0] == "g-ours",
+          "boundary: unnamed user boundary is never mis-tagged");
+
+    // regression: GUID emitted BEFORE Name within the object (review #5)
+    wxString info3 =
+        "{\"Boundaries\":["
+        "{\"GUID\":\"g-ours-3\",\"Name\":\"S-411 ice: caution\"},"
+        "{\"GUID\":\"g-user\",\"Name\":\"My fishing area\"}]}";
+    std::vector<wxString> o3;
+    S411JsonOurBoundaryGuids(info3, o3);
+    Check(o3.size() == 1 && o3[0] == "g-ours-3",
+          "boundary: GUID-before-Name ordering is handled object-scoped");
+
+    // 'GUID' must not match inside a longer key like 'BoundaryGUID'
+    Check(S411JsonField("{\"BoundaryGUID\":\"x\",\"GUID\":\"real\"}", "GUID") ==
+              "real",
+          "boundary: field scan matches the exact key, not a substring");
+
+    // a closed source ring must not export a duplicated first point
+    S411HazardZone closed;
+    closed.severity = S411CellState::Blocked;
+    closed.ring = {{54.0, 19.0}, {54.0, 20.0}, {55.0, 20.0}, {54.0, 19.0}};
+    wxString jc = S411BuildCreateBoundary(closed, "c");
+    int cpts = 0, cf = 0;
+    while ((cf = jc.find("\"BoundaryPointType\"", cf)) != wxNOT_FOUND) {
+      cpts++;
+      cf += 5;
+    }
+    Check(cpts == 3, "boundary: closed ring exports without the closing dup");
   }
 
   std::printf("\n%s (%d failure%s)\n", g_fail ? "FAILED" : "ALL TESTS PASSED",

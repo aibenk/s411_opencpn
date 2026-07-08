@@ -178,10 +178,29 @@ Zehnteln; Entscheidung dokumentiert im seaice-Repo, `docs/DECISIONS.md` #17):
 | 92 (10/10) | rot | rot | rot | rot |
 | 02 (bergy water) | überall hellblau *Open water / bergy water* — nie „Safe (ice free)" | | | |
 
-**Bekannte Grenzen (v0.4.0, kein Fehler):** Punkt-Features als generische
+**Ice-Routing (v0.5.0):**
+
+| # | Test | Soll |
+|---|---|---|
+| 21 | Datensatz laden, im Panel unten **Start → Set…**, auf die Karte klicken; dann **End → Set…**, klicken | die zwei Positionen erscheinen als Koordinaten im Panel |
+| 22 | **Vessel ice class** wählen, **Compute ice route** | eine Route erscheint in OpenCPN (Route-Manager), die um rote (hazardous) Eisflächen herumführt; Statuszeile nennt Distanz, Meilen in Caution-Eis und Etappenzahl |
+| 23 | Eisklasse von *No class* auf *IA Super* ändern, erneut Compute | die Route darf mehr Eis durchqueren (höhere Klasse → mehr grün/gelb passierbar) |
+| 24 | Start oder Ziel mitten in dichtem Eis setzen, Compute | der Router lässt das Startfeld verlassen; liegt das **Ziel** komplett im roten Eis, klare Fehlermeldung |
+| 25 | Kanal komplett durch Eis versperrt, Compute | Meldung „No route: …" statt Absturz oder Route quer durchs Eis |
+| 26 | **Avoid caution ice too** anhaken, Compute | die Route meidet zusätzlich gelbe Flächen (oder meldet, dass keine offene Passage bleibt) |
+| 27 | *(nur mit ocpn_draw_pi installiert)* **Export no-go zones** | Meldung „Exported N …"; in ocpn_draw erscheinen rote Exclusion-Grenzen um das gefährliche Eis; erneuter Export ersetzt nur die eigenen, eigene ocpn_draw-Grenzen des Nutzers bleiben |
+| 28 | Danach Weather Routing: *Configuration → Detect Boundary* an, Route rechnen | die Wetter-Route umfährt die exportierten Eiszonen |
+| 29 | *Export no-go zones* **ohne** ocpn_draw_pi | Hinweis, dass ocpn_draw_pi fehlt — kein Absturz |
+
+Der Router arbeitet auf den **sichtbaren** Datensätzen und der oben gewählten
+**Vessel ice class**; er nutzt die identische Ampel-Logik wie die Darstellung.
+
+**Bekannte Grenzen (v0.5.0, kein Fehler):** Punkt-Features als generische
 Dreiecke statt Annex-C-Symbole, Linien-Strichmuster sind Näherungen; bei
 geteiltem Bildschirm nutzt der Feature-Report den zuletzt gezeichneten
-Canvas-Viewport.
+Canvas-Viewport. Der Router sucht in einem Korridor um Start/Ziel (kein
+globales Routing über große Ozeanbecken); Start/Ziel oberhalb 85° werden
+abgelehnt.
 
 ---
 
