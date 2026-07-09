@@ -194,13 +194,19 @@ Zehnteln; Entscheidung dokumentiert im seaice-Repo, `docs/DECISIONS.md` #17):
 
 Der Router arbeitet auf den **sichtbaren** Datensätzen und der oben gewählten
 **Vessel ice class**; er nutzt die identische Ampel-Logik wie die Darstellung.
+Ab v0.6.0 wird der Suchkorridor bei „keine Route im Korridor" automatisch
+geweitet (×2/×4), und eine erneute Berechnung **ersetzt** die vorige Eisroute
+statt sie zu stapeln.
 
-**Bekannte Grenzen (v0.5.0, kein Fehler):** Punkt-Features als generische
+**Bekannte Grenzen (v0.6.0, kein Fehler):** Punkt-Features als generische
 Dreiecke statt Annex-C-Symbole, Linien-Strichmuster sind Näherungen; bei
 geteiltem Bildschirm nutzt der Feature-Report den zuletzt gezeichneten
 Canvas-Viewport. Der Router sucht in einem Korridor um Start/Ziel (kein
 globales Routing über große Ozeanbecken); Start/Ziel oberhalb 85° werden
-abgelehnt.
+abgelehnt. **10/10-Eis (und Festeis) gilt für JEDE Eisklasse als unpassierbar**
+— bewusst identisch zur Ampel-Darstellung; im Hochwinter kann daher „keine
+Route" die korrekte Antwort sein. (Ein durchlässiger Modus für Höchst-
+Eisklassen mit hoher Strafe wäre eine mögliche künftige Option.)
 
 ---
 
