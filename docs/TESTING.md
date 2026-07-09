@@ -98,6 +98,11 @@ sudo cp build/libs411_pi.so /usr/lib/opencpn/        # ggf. Pfad anpassen
    Modus, Eisklasse, Palette und Deckkraft werden gespeichert und beim
    nächsten Start wiederhergestellt. Denselben Dialog gibt es unter
    *Options → Plugins → S-411 Ice → Preferences*.
+   Beim **allerersten Öffnen** startet automatisch eine **geführte Tour**
+   (abgedunkeltes Panel, gelb umrandeter Fokus auf je einem Bedienelement,
+   Karte mit *← Back / Next → / Skip*). Später jederzeit über den **?**-Button
+   oben rechts im Panel erneut aufrufbar. Das „gesehen"-Flag wird in der
+   OpenCPN-Config gespeichert (`/PlugIns/S411/TutorialSeen`).
 4. **Feature-Report:** kurzer Klick (ohne Ziehen, < 4 px Mausbewegung) auf
    ein Eis-Feature öffnet ein Fenster mit allen Attributen; Konzentrations-
    und Entwicklungsstadium-Codes werden im Klartext decodiert

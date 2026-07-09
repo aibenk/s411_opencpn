@@ -9,6 +9,7 @@
 #include <wx/checkbox.h>
 #include <wx/checklst.h>
 #include <wx/choice.h>
+#include <wx/dcbuffer.h>
 #include <wx/dcmemory.h>
 #include <wx/fileconf.h>
 #include <wx/filedlg.h>
@@ -19,6 +20,7 @@
 #include <wx/slider.h>
 #include <wx/statline.h>
 #include <wx/stattext.h>
+#include <wx/tokenzr.h>
 
 #include <cmath>
 
@@ -103,6 +105,183 @@ private:
 // palette) plus load/clear/show, per-dataset visibility list, zoom-to-data,
 // fill opacity and a legend. Non-modal so it can stay open as a panel.
 // ===========================================================================
+// ===========================================================================
+// guided tour: a glass overlay that dims the control panel and highlights one
+// control at a time with a caption and Back / Next / Skip navigation. Shown
+// automatically on first use and re-invokable from the "?" button. Purely a
+// wxWindow overlay, so it needs no knowledge of the dialog internals - the
+// caller hands it a list of (target control, title, text) steps.
+// ===========================================================================
+class S411Tutorial : public wxPanel {
+public:
+  struct Step {
+    wxWindow *target;  // control to highlight (may be null for a centred step)
+    wxString title;
+    wxString body;
+  };
+
+  explicit S411Tutorial(wxWindow *host)
+      : wxPanel(host, wxID_ANY, wxPoint(0, 0), host->GetClientSize(),
+                wxBORDER_NONE | wxFULL_REPAINT_ON_RESIZE),
+        m_host(host) {
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    m_back = new wxButton(this, wxID_ANY, "← Back");
+    m_next = new wxButton(this, wxID_ANY, "Next →");
+    m_skip = new wxButton(this, wxID_ANY, "Skip");
+    m_back->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Go(-1); });
+    m_next->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Go(+1); });
+    m_skip->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Finish(); });
+    Bind(wxEVT_PAINT, &S411Tutorial::OnPaint, this);
+    m_host->Bind(wxEVT_SIZE, &S411Tutorial::OnHostSize, this);
+    Hide();
+  }
+
+  void SetSteps(std::vector<Step> steps) { m_steps = std::move(steps); }
+
+  void Start() {
+    if (m_steps.empty()) return;
+    m_idx = 0;
+    Cover();
+    Show();
+    Raise();
+    LayoutStep();
+  }
+
+private:
+  void OnHostSize(wxSizeEvent &e) {
+    if (IsShown()) { Cover(); LayoutStep(); }
+    e.Skip();
+  }
+  void Cover() { SetSize(wxRect(wxPoint(0, 0), m_host->GetClientSize())); }
+  void Finish() { Hide(); }
+  void Go(int d) {
+    m_idx += d;
+    if (m_idx < 0) m_idx = 0;
+    if (m_idx >= (int)m_steps.size()) { Finish(); return; }
+    LayoutStep();
+  }
+
+  wxRect TargetRect() {
+    const Step &s = m_steps[m_idx];
+    if (!s.target || !s.target->IsShownOnScreen()) return wxRect();
+    wxRect r = s.target->GetScreenRect();
+    r.SetTopLeft(ScreenToClient(r.GetTopLeft()));
+    return r;
+  }
+
+  std::vector<wxString> Wrap(const wxString &text, int maxW) {
+    std::vector<wxString> lines;
+    wxString line;
+    wxStringTokenizer tok(text, " ");
+    while (tok.HasMoreTokens()) {
+      wxString w = tok.GetNextToken();
+      wxString cand = line.IsEmpty() ? w : line + " " + w;
+      if (GetTextExtent(cand).GetWidth() > maxW && !line.IsEmpty()) {
+        lines.push_back(line);
+        line = w;
+      } else {
+        line = cand;
+      }
+    }
+    if (!line.IsEmpty()) lines.push_back(line);
+    return lines;
+  }
+
+  void LayoutStep() {
+    const wxSize cs = GetClientSize();
+    const int pad = 12;
+    const int capW = wxMin(320, cs.x - 2 * pad);
+    m_lines = Wrap(m_steps[m_idx].body, capW - 2 * pad);
+    const int lineH = GetCharHeight() + 3;
+    const int titleH = GetCharHeight() + 8;
+    const int btnH = m_next->GetBestSize().y;
+    const int capH =
+        pad + titleH + (int)m_lines.size() * lineH + 8 + btnH + pad;
+
+    // place the caption below the highlighted control, else above, else centre
+    const wxRect t = TargetRect();
+    int cx = (cs.x - capW) / 2, cy;
+    if (t.IsEmpty()) {
+      cy = (cs.y - capH) / 2;
+    } else {
+      cx = wxMax(pad, wxMin(cs.x - capW - pad,
+                            t.x + t.width / 2 - capW / 2));
+      if (t.GetBottom() + 8 + capH <= cs.y - pad)
+        cy = t.GetBottom() + 8;
+      else
+        cy = wxMax(pad, t.y - 8 - capH);
+    }
+    m_capBox = wxRect(cx, cy, capW, capH);
+
+    // navigation buttons along the caption footer
+    const int by = m_capBox.GetBottom() - pad - btnH + 1;
+    int rx = m_capBox.GetRight() - pad;
+    const bool last = m_idx + 1 >= (int)m_steps.size();
+    m_next->SetLabel(last ? "Finish" : "Next →");
+    for (wxButton *btn : {m_next, m_back}) {
+      const int w = btn->GetBestSize().x;
+      rx -= w;
+      btn->SetSize(rx, by, w, btnH);
+      rx -= 6;
+    }
+    m_back->Enable(m_idx > 0);
+    m_skip->SetSize(m_capBox.x + pad, by, m_skip->GetBestSize().x, btnH);
+    m_skip->Show(!last);
+    Refresh();
+  }
+
+  void OnPaint(wxPaintEvent &) {
+    wxAutoBufferedPaintDC dc(this);
+    const wxSize cs = GetClientSize();
+    wxGraphicsContext *gc = wxGraphicsContext::Create(dc);
+    if (!gc) return;
+    const wxColour dim(10, 18, 30, 150);
+    const wxRect t = TargetRect();
+    gc->SetPen(*wxTRANSPARENT_PEN);
+    gc->SetBrush(wxBrush(dim));
+    if (t.IsEmpty()) {
+      gc->DrawRectangle(0, 0, cs.x, cs.y);
+    } else {
+      // dim everything except the highlighted control (four surround strips)
+      gc->DrawRectangle(0, 0, cs.x, t.y);
+      gc->DrawRectangle(0, t.GetBottom() + 1, cs.x, cs.y - t.GetBottom() - 1);
+      gc->DrawRectangle(0, t.y, t.x, t.height);
+      gc->DrawRectangle(t.GetRight() + 1, t.y, cs.x - t.GetRight() - 1,
+                        t.height);
+      gc->SetBrush(*wxTRANSPARENT_BRUSH);
+      gc->SetPen(wxPen(wxColour(255, 190, 0), 3));
+      gc->DrawRoundedRectangle(t.x - 3, t.y - 3, t.width + 6, t.height + 6, 4);
+    }
+
+    // caption card
+    gc->SetPen(wxPen(wxColour(0, 0, 76), 2));
+    gc->SetBrush(wxBrush(wxColour(252, 250, 244)));
+    gc->DrawRoundedRectangle(m_capBox.x, m_capBox.y, m_capBox.width,
+                             m_capBox.height, 8);
+    const int pad = 12;
+    int y = m_capBox.y + pad;
+    gc->SetFont(GetFont().Bold(), wxColour(0, 0, 76));
+    const wxString heading = wxString::Format("%s   (%d/%d)",
+                                              m_steps[m_idx].title, m_idx + 1,
+                                              (int)m_steps.size());
+    gc->DrawText(heading, m_capBox.x + pad, y);
+    y += GetCharHeight() + 8;
+    gc->SetFont(GetFont(), wxColour(28, 39, 51));
+    for (const auto &ln : m_lines) {
+      gc->DrawText(ln, m_capBox.x + pad, y);
+      y += GetCharHeight() + 3;
+    }
+    delete gc;
+  }
+
+  wxWindow *m_host;
+  std::vector<Step> m_steps;
+  int m_idx = 0;
+  wxButton *m_back, *m_next, *m_skip;
+  wxRect m_capBox;
+  std::vector<wxString> m_lines;
+};
+
 class S411CtrlDialog : public wxDialog {
 public:
   S411CtrlDialog(wxWindow *parent, s411_pi *pi)
@@ -116,11 +295,15 @@ public:
     s->Add(m_show, 0, wxALL, b);
 
     auto *btns = new wxBoxSizer(wxHORIZONTAL);
-    auto *load = new wxButton(this, wxID_ANY, "Load data…");
+    m_loadBtn = new wxButton(this, wxID_ANY, "Load data…");
     auto *clear = new wxButton(this, wxID_ANY, "Clear");
-    btns->Add(load, 0, wxRIGHT, b);
+    m_help = new wxButton(this, wxID_ANY, "?", wxDefaultPosition, wxSize(28, -1));
+    m_help->SetToolTip("Show the guided tour again");
+    btns->Add(m_loadBtn, 0, wxRIGHT, b);
     btns->Add(clear, 0);
-    s->Add(btns, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    btns->AddStretchSpacer(1);
+    btns->Add(m_help, 0);
+    s->Add(btns, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
 
     m_status = new wxStaticText(this, wxID_ANY, "");
     s->Add(m_status, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
@@ -187,9 +370,9 @@ public:
             wxALIGN_CENTRE_VERTICAL);
     m_startLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
     rg->Add(m_startLbl, 1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
-    auto *pickS = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
+    m_pickStart = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
                                wxSize(56, -1));
-    rg->Add(pickS, 0);
+    rg->Add(m_pickStart, 0);
     rg->Add(new wxStaticText(this, wxID_ANY, "End"), 0,
             wxALIGN_CENTRE_VERTICAL);
     m_endLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
@@ -204,8 +387,8 @@ public:
     s->Add(m_avoidCaution, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
 
     auto *rb = new wxBoxSizer(wxHORIZONTAL);
-    auto *compute = new wxButton(this, wxID_ANY, "Compute ice route");
-    rb->Add(compute, 0, wxRIGHT, b);
+    m_compute = new wxButton(this, wxID_ANY, "Compute ice route");
+    rb->Add(m_compute, 0, wxRIGHT, b);
     m_export = new wxButton(this, wxID_ANY, "Export no-go zones");
     rb->Add(m_export, 0);
     s->Add(rb, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
@@ -213,15 +396,17 @@ public:
     m_routeStatus->Wrap(320);
     s->Add(m_routeStatus, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
 
-    pickS->Bind(wxEVT_BUTTON,
-                [this](wxCommandEvent &) { m_pi->BeginPickPoint(0); });
+    m_pickStart->Bind(wxEVT_BUTTON,
+                      [this](wxCommandEvent &) { m_pi->BeginPickPoint(0); });
     pickE->Bind(wxEVT_BUTTON,
                 [this](wxCommandEvent &) { m_pi->BeginPickPoint(1); });
     m_avoidCaution->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &) {
       m_pi->RouteParams().avoidCaution = m_avoidCaution->GetValue();
     });
-    compute->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnCompute, this);
+    m_compute->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnCompute, this);
     m_export->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnExport, this);
+    m_help->Bind(wxEVT_BUTTON,
+                 [this](wxCommandEvent &) { StartTutorial(); });
 
     auto *close = new wxButton(this, wxID_CLOSE, "Close");
     s->Add(close, 0, wxALIGN_RIGHT | wxALL, b);
@@ -236,7 +421,7 @@ public:
     m_class->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_pal->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_opacity->Bind(wxEVT_SLIDER, &S411CtrlDialog::OnAny, this);
-    load->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnLoad, this);
+    m_loadBtn->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnLoad, this);
     clear->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnClear, this);
     m_list->Bind(wxEVT_CHECKLISTBOX, &S411CtrlDialog::OnListCheck, this);
     zoom->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnZoom, this);
@@ -367,7 +552,65 @@ private:
   wxStaticText *m_startLbl = nullptr, *m_endLbl = nullptr,
                *m_routeStatus = nullptr;
   wxCheckBox *m_avoidCaution = nullptr;
-  wxButton *m_export = nullptr;
+  wxButton *m_loadBtn = nullptr, *m_export = nullptr, *m_help = nullptr,
+           *m_pickStart = nullptr, *m_compute = nullptr;
+  S411Tutorial *m_tutorial = nullptr;
+
+public:
+  /** Launch the guided tour (also called automatically the first time the
+   *  panel is opened). Safe to call repeatedly. */
+  void StartTutorial() {
+    if (!m_tutorial) m_tutorial = new S411Tutorial(this);
+    m_tutorial->SetSteps({
+        {nullptr,
+         "Welcome to S-411 Ice",
+         "This panel controls the ice overlay. This quick tour points out "
+         "each control. Use Next, or Skip to leave. You can reopen it any "
+         "time with the ? button."},
+        {m_loadBtn, "Load ice data",
+         "Open S-411 datasets: single GML files, a whole exchange set "
+         "(pick its CATALOG.XML) or a .zip archive. The chart jumps to the "
+         "data once it loads."},
+        {m_show, "Show / hide",
+         "Toggle the ice overlay on the chart. Loaded data stays in memory "
+         "when hidden."},
+        {m_list, "Your datasets",
+         "Each loaded dataset is listed here. Tick to show/hide it, or use "
+         "Zoom to data and Remove below the list."},
+        {m_mode, "Display mode",
+         "Colour the ice by concentration, by stage of development, or as a "
+         "navigational traffic light (green/amber/red)."},
+        {m_class, "Vessel ice class",
+         "In the navigational mode this sets the green/amber/red thresholds "
+         "for your ship's ice class - and it drives the route planner."},
+        {m_pal, "Palette",
+         "Day, Dusk or Night colours. The fill-opacity slider below controls "
+         "how solid the ice areas look over the chart."},
+        {m_pickStart, "Plan an ice route",
+         "Set a start and an end position by clicking the chart, choose a "
+         "vessel ice class above, then Compute ice route: an ice-aware path "
+         "is added to OpenCPN, avoiding hazardous ice and land."},
+        {m_compute, "Compute / recompute",
+         "Computes the route on the visible datasets. Recomputing replaces "
+         "the previous ice route rather than stacking a new one."},
+        {m_export, "Weather Routing",
+         "With the ocpn_draw_pi plugin installed, export the dangerous ice "
+         "as exclusion boundaries so the Weather Routing plugin avoids them "
+         "too."},
+        {m_help, "That's it",
+         "Click any ice feature on the chart for a full attribute report. "
+         "Reopen this tour with the ? button whenever you need it. Fair "
+         "winds!"},
+    });
+    m_tutorial->Start();
+  }
+
+  /** Run the tour automatically the very first time the panel is shown. */
+  void MaybeAutoTutorial() {
+    if (m_pi->m_tutorialSeen) return;
+    m_pi->MarkTutorialSeen();
+    CallAfter(&S411CtrlDialog::StartTutorial);
+  }
 };
 
 // ===========================================================================
@@ -557,6 +800,12 @@ void s411_pi::ShowControl() {
   m_dialog->UpdateStatus();
   m_dialog->Show();
   m_dialog->Raise();
+  m_dialog->MaybeAutoTutorial();  // guided tour on first open
+}
+
+void s411_pi::MarkTutorialSeen() {
+  m_tutorialSeen = true;
+  SaveConfig();
 }
 
 void s411_pi::OnToolbarToolCallback(int id) {
@@ -822,6 +1071,7 @@ void s411_pi::LoadConfig() {
   double pen = 4.0;
   cfg->Read("RouteCautionPenalty", &pen, 4.0);
   m_route.cautionPenalty = wxMax(1.0, wxMin(50.0, pen));
+  cfg->Read("TutorialSeen", &m_tutorialSeen, false);
 }
 
 void s411_pi::SaveConfig() {
@@ -835,6 +1085,7 @@ void s411_pi::SaveConfig() {
   cfg->Write("FillAlpha", (long)m_alpha);
   cfg->Write("RouteAvoidCaution", m_route.avoidCaution);
   cfg->Write("RouteCautionPenalty", m_route.cautionPenalty);
+  cfg->Write("TutorialSeen", m_tutorialSeen);
   cfg->Flush();
 }
 

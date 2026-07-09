@@ -11,7 +11,7 @@
 #             OpenCPN's Options -> Plugins -> "Import plugin..." (preferred)
 
 param([switch]$Install, [switch]$Package)
-$Version = "0.6.0"
+$Version = "0.7.0"
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 $sdk = "$repo\sdk"

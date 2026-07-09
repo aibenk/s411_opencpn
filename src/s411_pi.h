@@ -33,7 +33,7 @@ public:
   int GetAPIVersionMajor() override { return 1; }
   int GetAPIVersionMinor() override { return 16; }
   int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 6; }
+  int GetPlugInVersionMinor() override { return 7; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;
@@ -90,6 +90,10 @@ public:
   void ClearHazards();
   bool OcpnDrawAvailable() const { return m_odAvailable; }
   S411RouteParams &RouteParams() { return m_route; }
+
+  // guided tour: shown once automatically, re-invokable from the panel's "?"
+  bool m_tutorialSeen = false;
+  void MarkTutorialSeen();
 
   // portrayal state (read/written by the control dialog)
   bool m_show = false;
