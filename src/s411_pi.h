@@ -33,7 +33,7 @@ public:
   int GetAPIVersionMajor() override { return 1; }
   int GetAPIVersionMinor() override { return 16; }
   int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 5; }
+  int GetPlugInVersionMinor() override { return 6; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;
@@ -73,6 +73,9 @@ public:
   // --- routing (called back by the routing panel) ------------------------
   /** Arm map-click capture for start (which==0) or end (which==1). */
   void BeginPickPoint(int which);
+  /** Disarm map-click capture (called when the panel is hidden/closed) so an
+   *  ordinary chart click is never silently stolen to set a route point. */
+  void CancelPick() { m_pickMode = 0; }
   bool HaveStart() const { return m_haveStart; }
   bool HaveEnd() const { return m_haveEnd; }
   wxString StartLabel() const;

@@ -241,8 +241,10 @@ public:
     m_list->Bind(wxEVT_CHECKLISTBOX, &S411CtrlDialog::OnListCheck, this);
     zoom->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnZoom, this);
     remove->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnRemove, this);
-    close->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Hide(); });
-    Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &) { Hide(); });
+    close->Bind(wxEVT_BUTTON,
+                [this](wxCommandEvent &) { m_pi->CancelPick(); Hide(); });
+    Bind(wxEVT_CLOSE_WINDOW,
+         [this](wxCloseEvent &) { m_pi->CancelPick(); Hide(); });
   }
 
   void FromState() {
@@ -722,6 +724,15 @@ wxString s411_pi::ComputeRoute(bool &ok) {
   };
   if (!S411ComputeIceRoute(m_data, m_start, m_end, m_route, land, r))
     return "No route: " + r.error;
+  if (r.waypoints.size() < 2)
+    return "Start and end are effectively the same position - nothing to "
+           "route.";
+
+  // replace a previous ice route instead of stacking a new one each recompute
+  if (!m_lastRouteGuid.IsEmpty()) {
+    DeletePlugInRoute(m_lastRouteGuid);
+    m_lastRouteGuid.Clear();
+  }
 
   // hand the polyline to OpenCPN's route manager
   PlugIn_Route route;  // its ctor allocates pWaypointList; its dtor frees it
@@ -939,11 +950,21 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
             continue;
           }
 #endif
-          RingToPix(vp, f.rings[0], pix);
-          if (pix.size() < 3) continue;
+          // plain-DC fallback (print/PDF): draw all rings with even-odd so
+          // holes and secondary exteriors match the GC/GL paths
+          std::vector<wxPoint> allPts;
+          std::vector<int> counts;
+          for (const auto &ring : f.rings) {
+            RingToPix(vp, ring, pix);
+            if (pix.size() < 3) continue;
+            counts.push_back((int)pix.size());
+            allPts.insert(allPts.end(), pix.begin(), pix.end());
+          }
+          if (counts.empty()) continue;
           dc.SetBrush(wxBrush(berg ? wxColour(200, 200, 200) : fill));
           dc.SetPen(wxPen(*wxBLACK, 1));
-          dc.DrawPolygon((int)pix.size(), pix.data());
+          dc.DrawPolyPolygon((int)counts.size(), counts.data(),
+                             allPts.data(), 0, 0, wxODDEVEN_RULE);
         } else if (f.kind == S411Kind::Line) {
           RingToPix(vp, f.rings[0], pix);
           if (pix.size() < 2) continue;

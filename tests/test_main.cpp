@@ -336,6 +336,24 @@ int main(int argc, char **argv) {
       Check(!through, "router: no diagonal corner-cut through blocked ice");
     }
 
+    // (a3) a detour that only fits in a WIDER corridor: the retry must widen
+    //      the margin and still find the way around (review B8)
+    {
+      // wall lon 9..11 spanning lat -0.4..0.4; a tight initial corridor
+      // (margin 0.3) is fully sealed, a x2 retry (0.6) exposes a gap
+      S411RouteParams p2 = pr;
+      p2.minMarginDeg = 0.3;
+      p2.marginFrac = 0.05;
+      auto data = dataset({box(-0.4, 0.4, 9.0, 11.0, "92")});
+      S411RouteResult r;
+      bool ok = S411ComputeIceRoute(data, {0.0, 5.0}, {0.0, 15.0}, p2, noLand,
+                                    r);
+      Check(ok, "router: widens the corridor to find a detour");
+      double maxAbs = 0;
+      for (const auto &w : r.waypoints) maxAbs = std::max(maxAbs, std::fabs(w.lat));
+      Check(maxAbs > 0.4, "router: retry detour leaves the initial corridor");
+    }
+
     // (b) a barrier that fully seals the corridor -> no route
     {
       auto data = dataset({box(-10.0, 10.0, 9.0, 11.0, "92")});
@@ -422,6 +440,49 @@ int main(int argc, char **argv) {
             "hazard: amber excluded unless requested");
       Check(S411ExtractHazards(amber, "", true, 60, zones2) == 1,
             "hazard: amber included when requested");
+    }
+
+    // (g) router + hazards on REAL geometry (many small polygons, holes,
+    //     antimeridian) - pins the Shift/NormLon path end to end
+    {
+      std::vector<S411Dataset> baltic(1);
+      wxString e;
+      if (LoadS411File(fx + "/411DE00EK1250220.GML", baltic[0], e)) {
+        std::vector<S411HazardZone> zones;
+        size_t nz = S411ExtractHazards(baltic, "", false, 60, zones);
+        Check(nz > 0, "real: hazards extracted from the BSH Baltic chart");
+        bool ringsOk = true;
+        for (const auto &z : zones)
+          if (z.ring.size() < 3 || z.ring.size() > 60) ringsOk = false;
+          else
+            for (const auto &pnt : z.ring)
+              if (pnt.lon < -180.5 || pnt.lon > 180.5) ringsOk = false;
+        Check(ringsOk, "real: hazard rings within [3,60] pts and in-range lon");
+        // route across the aggregate lon range at a mid latitude: must return
+        // cleanly (a route with sane stats, or a non-empty 'no route' reason)
+        S411RouteParams rp;
+        double midLat = (baltic[0].latMin + baltic[0].latMax) / 2.0;
+        S411RouteResult rr;
+        bool rok = S411ComputeIceRoute(
+            baltic, {midLat, baltic[0].lonMin + 0.3},
+            {midLat, baltic[0].lonMax - 0.3}, rp, nullptr, rr);
+        bool sane =
+            rok ? (rr.waypoints.size() >= 2 && rr.distanceNm > 0 &&
+                   rr.distanceNm < 1e5 && rr.cautionNm >= 0)
+                : !rr.error.IsEmpty();
+        Check(sane, "real: BSH route returns a coherent result or clean error");
+      }
+      std::vector<S411Dataset> ak(1);
+      if (LoadS411File(fx + "/411US01AK260701.GML", ak[0], e)) {
+        S411RouteParams rp;
+        S411RouteResult rr;
+        // straddle the antimeridian (Chukchi to Beaufort)
+        S411ComputeIceRoute(ak, {71.0, 179.0}, {71.5, -179.0}, rp, nullptr, rr);
+        bool inRange = true;
+        for (const auto &w : rr.waypoints)
+          if (w.lon < -180.5 || w.lon > 180.5) inRange = false;
+        Check(inRange, "real: Alaska route waypoints stay in [-180,180]");
+      }
     }
   }
 

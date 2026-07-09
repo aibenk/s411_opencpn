@@ -501,7 +501,10 @@ size_t LoadS411Zip(const wxString &zipPath, std::vector<S411Dataset> &out,
   return loaded;
 }
 
-static void FindGmlFiles(const wxString &dir, wxArrayString &out) {
+static void FindGmlFiles(const wxString &dir, wxArrayString &out,
+                         int depth = 0) {
+  if (depth > 16) return;  // exchange sets are shallow; cap guards link cycles
+                           // (wxDirExists resolves links, bypassing NO_FOLLOW)
   wxDir d(dir);
   if (!d.IsOpened()) return;
   wxString name;
@@ -510,7 +513,7 @@ static void FindGmlFiles(const wxString &dir, wxArrayString &out) {
   while (more) {
     wxString full = dir + wxFileName::GetPathSeparator() + name;
     if (wxDirExists(full))
-      FindGmlFiles(full, out);
+      FindGmlFiles(full, out, depth + 1);
     else if (IsGmlName(name))
       out.Add(full);
     more = d.GetNext(&name);

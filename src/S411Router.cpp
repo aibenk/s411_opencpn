@@ -114,6 +114,31 @@ void FillFeature(Grid &g, const S411Feature &f, S411CellState sev) {
         if ((unsigned char)sev > g.Get(i, j)) g.At(i, j) = (unsigned char)sev;
     }
   }
+
+  // Conservative edge rasterization: the scanline above only stamps cells
+  // whose CENTRE lies inside the polygon, so a Blocked barrier (or feature)
+  // thinner than one grid cell could fall entirely between cell centres and
+  // let A* route straight through it. Stamp every cell each ring edge passes
+  // through so a non-Free feature always has a >= 1-cell footprint. This can
+  // thicken a feature by at most one cell (conservative, safe).
+  for (const auto &ring : f.rings) {
+    const size_t n = ring.size();
+    if (n < 2) continue;
+    for (size_t a = 0; a < n; a++) {
+      const double x0 = ring[a].lon - k, y0 = ring[a].lat;
+      const double x1 = ring[(a + 1) % n].lon - k, y1 = ring[(a + 1) % n].lat;
+      const int steps =
+          1 + (int)std::ceil(2.0 * std::max(std::fabs(x1 - x0) / g.dLon,
+                                            std::fabs(y1 - y0) / g.dLat));
+      for (int s = 0; s <= steps; s++) {
+        const double t = (double)s / steps;
+        const int i = g.Col(x0 + t * (x1 - x0));
+        const int j = g.Row(y0 + t * (y1 - y0));
+        if (g.Inside(i, j) && (unsigned char)sev > g.Get(i, j))
+          g.At(i, j) = (unsigned char)sev;
+      }
+    }
+  }
 }
 
 double StateFactor(unsigned char st, const S411RouteParams &p) {
@@ -129,28 +154,18 @@ double StateFactor(unsigned char st, const S411RouteParams &p) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// A* route computation
+// A* route computation. One attempt over a corridor sized by p's margins;
+// corridorBounded is set when the failure was "no path within the corridor"
+// (worth retrying with a wider margin) rather than a hard failure such as the
+// destination lying in impassable ice.
 // ---------------------------------------------------------------------------
-bool S411ComputeIceRoute(const std::vector<S411Dataset> &data,
-                         const S411Pos &startIn, const S411Pos &endIn,
-                         const S411RouteParams &p,
-                         const S411LandFn &crossesLand, S411RouteResult &out) {
+static bool ComputeRouteOnce(const std::vector<S411Dataset> &data,
+                             const S411Pos &start, const S411Pos &end,
+                             const S411RouteParams &p,
+                             const S411LandFn &crossesLand,
+                             S411RouteResult &out, bool &corridorBounded) {
   out = S411RouteResult();
-  S411Pos start = startIn, end = endIn;
-  if (!std::isfinite(start.lat) || !std::isfinite(start.lon) ||
-      !std::isfinite(end.lat) || !std::isfinite(end.lon)) {
-    out.error = "non-finite start/end coordinate";
-    return false;
-  }
-  start.lon = NormLon(start.lon);
-  end.lon = NormLon(end.lon);
-  // continuous longitude domain across the antimeridian
-  end.lon -= 360.0 * std::round((end.lon - start.lon) / 360.0);
-
-  if (std::fabs(start.lat) > 85.0 || std::fabs(end.lat) > 85.0) {
-    out.error = "positions above 85 degrees latitude are not supported";
-    return false;
-  }
+  corridorBounded = false;
 
   // search corridor
   double latMin = std::min(start.lat, end.lat);
@@ -257,6 +272,7 @@ bool S411ComputeIceRoute(const std::vector<S411Dataset> &data,
     out.error =
         "no passable route found - the area is closed by ice (or land) for "
         "this ice class within the search corridor";
+    corridorBounded = true;  // a wider corridor might contain a detour
     return false;
   }
 
@@ -350,6 +366,41 @@ bool S411ComputeIceRoute(const std::vector<S411Dataset> &data,
   for (auto &w : smooth) w.lon = NormLon(w.lon);
   out.waypoints = smooth;
   return true;
+}
+
+bool S411ComputeIceRoute(const std::vector<S411Dataset> &data,
+                         const S411Pos &startIn, const S411Pos &endIn,
+                         const S411RouteParams &p,
+                         const S411LandFn &crossesLand, S411RouteResult &out) {
+  out = S411RouteResult();
+  S411Pos start = startIn, end = endIn;
+  if (!std::isfinite(start.lat) || !std::isfinite(start.lon) ||
+      !std::isfinite(end.lat) || !std::isfinite(end.lon)) {
+    out.error = "non-finite start/end coordinate";
+    return false;
+  }
+  start.lon = NormLon(start.lon);
+  end.lon = NormLon(end.lon);
+  end.lon -= 360.0 * std::round((end.lon - start.lon) / 360.0);
+  if (std::fabs(start.lat) > 85.0 || std::fabs(end.lat) > 85.0) {
+    out.error = "positions above 85 degrees latitude are not supported";
+    return false;
+  }
+
+  // Try the configured corridor; if the ONLY problem was that no detour fit
+  // inside it, widen the margins and retry (a hard failure such as the
+  // destination lying in impassable ice is returned immediately).
+  S411RouteParams pr = p;
+  for (int attempt = 0; attempt < 3; attempt++) {
+    bool corridorBounded = false;
+    if (ComputeRouteOnce(data, start, end, pr, crossesLand, out,
+                         corridorBounded))
+      return true;
+    if (!corridorBounded) return false;  // hard failure - do not widen
+    pr.marginFrac *= 2.0;
+    pr.minMarginDeg *= 2.0;
+  }
+  return false;  // out.error already holds the "within the search corridor" msg
 }
 
 // ---------------------------------------------------------------------------
