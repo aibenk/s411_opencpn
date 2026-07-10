@@ -1,17 +1,16 @@
-# s411_pi testen — Anleitung
+# Testing s411_pi — guide
 
-Diese Anleitung beschreibt drei Stufen: **(1)** die automatischen Parser-Tests
-(ohne OpenCPN), **(2)** den Praxistest im laufenden OpenCPN unter Linux/WSL —
-der schnellste Weg zum echten Hands-on — und **(3)** den nativen
-Windows-Build. Dazu eine Test-Checkliste mit Soll-Ergebnissen.
+This guide covers three levels: **(1)** the automated parser tests (no OpenCPN),
+**(2)** hands-on testing inside a running OpenCPN on Linux/WSL — the fastest way
+to real hands-on use — and **(3)** the native Windows build. Plus a test
+checklist with expected results.
 
 ---
 
-## 1. Automatische Tests (ohne OpenCPN, 2 Minuten)
+## 1. Automated tests (no OpenCPN, 2 minutes)
 
-Die Lade-Pipeline (GML-Parser, Exchange-Sets, Zips, Antimeridian,
-Triangulierung) ist headless testbar — dieselben Tests laufen bei jedem Push
-im GitHub-CI.
+The load pipeline (GML parser, exchange sets, zips, antimeridian, triangulation)
+is testable headlessly — the same tests run on every push in GitHub CI.
 
 **Linux / WSL:**
 
@@ -24,40 +23,40 @@ cmake --build build --parallel
 ./build/s411_test tests/fixtures
 ```
 
-**Soll:** `ALL TESTS PASSED (0 failures)` — 53 Checks gegen echte Daten:
-BSH-Ostseekarte mit 337 Features, NWS-Alaska über 180°, Eisbericht-Stationen,
-Exchange-Set als Verzeichnis und als Zip, **Achsen-Erkennung** (lat/lon vs.
-lon/lat, 0–360°-Längen, CRS84-`srsName` für den ambigen Ostsee-Fall),
-Hit-Test fürs Feature-Picking, Attribut-Erfassung, Code-Labels und die
-Ampel-Semantik (identische Tabellen wie Web-Viewer, `rules/main.xsl` und
-`tools/validate.py` im Spez-Repo — dort per CI gegengeprüft).
+**Expected:** `ALL TESTS PASSED (0 failures)` — 53 checks against real data:
+a BSH Baltic chart with 337 features, NWS Alaska across 180°, ice-report
+stations, an exchange set as a directory and as a zip, **axis detection**
+(lat/lon vs lon/lat, 0–360° longitudes, a CRS84 `srsName` for the ambiguous
+Baltic case), the hit test for feature picking, attribute capture, code labels
+and the traffic-light semantics (the same tables as the web viewer and the
+normative `rules/main.xsl` in the S-411 specification project).
 
-**Windows ohne CMake:** `testbuild\s411_test.exe tests\fixtures` (wird von
-den Build-Schritten in diesem Repo mitgepflegt).
+**Windows without CMake:** `testbuild\s411_test.exe tests\fixtures` (kept in
+step by the build steps in this repo).
 
 ---
 
-## 2. Praxistest in OpenCPN (empfohlen: Ubuntu in WSL2)
+## 2. Hands-on in OpenCPN (recommended: Ubuntu in WSL2)
 
-Windows 11 mit WSL2 hat GUI-Unterstützung eingebaut (WSLg) — OpenCPN läuft
-darin als normales Fenster. Das umgeht den mühsamen nativen Windows-Build.
+Windows 11 with WSL2 has built-in GUI support (WSLg) — OpenCPN runs in it as a
+normal window. This avoids the tedious native Windows build.
 
-### 2.1 Einrichtung (einmalig)
+### 2.1 Setup (once)
 
 ```powershell
-wsl --install -d Ubuntu-24.04     # falls noch kein WSL vorhanden; danach neu starten
+wsl --install -d Ubuntu-24.04     # if you have no WSL yet; then reboot
 ```
 
-In der Ubuntu-Shell:
+In the Ubuntu shell:
 
 ```sh
 sudo apt update
 sudo apt install -y opencpn cmake g++ libwxgtk3.2-dev libglu1-mesa-dev git
 ```
 
-> Falls die Paketquelle kein OpenCPN hat: `sudo add-apt-repository ppa:opencpn/opencpn && sudo apt update && sudo apt install opencpn`
+> If your package source has no OpenCPN: `sudo add-apt-repository ppa:opencpn/opencpn && sudo apt update && sudo apt install opencpn`
 
-### 2.2 Plugin bauen und installieren
+### 2.2 Build and install the plugin
 
 ```sh
 git clone https://github.com/aibenk/s411_opencpn
@@ -65,201 +64,198 @@ cd s411_opencpn
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 
-# Plugin-Verzeichnis der OpenCPN-Installation finden:
+# find the OpenCPN installation's plugin directory:
 ls -d /usr/lib/opencpn /usr/lib/*/opencpn 2>/dev/null
-sudo cp build/libs411_pi.so /usr/lib/opencpn/        # ggf. Pfad anpassen
+sudo cp build/libs411_pi.so /usr/lib/opencpn/        # adjust the path if needed
 ```
 
-> **Wichtig:** Das Plugin muss gegen dieselbe wxWidgets-Version gebaut sein
-> wie OpenCPN selbst. Bei „apt-OpenCPN + apt-wxWidgets" passt das automatisch.
-> Lädt OpenCPN das Plugin nicht (bleibt in der Plugin-Liste unsichtbar),
-> `opencpn` einmal im Terminal starten und die Meldungen lesen.
+> **Important:** the plugin must be built against the same wxWidgets version as
+> OpenCPN itself. With "apt OpenCPN + apt wxWidgets" this matches automatically.
+> If OpenCPN does not load the plugin (it stays invisible in the plugin list),
+> start `opencpn` once from the terminal and read the messages.
 
-### 2.3 Aktivieren und bedienen
+### 2.3 Enable and use
 
-1. OpenCPN starten (`opencpn`).
-2. *Options → Plugins* → **S-411 Ice** ankreuzen → *OK*.
-3. In der Werkzeugleiste erscheint der **411**-Button. Ein Klick öffnet nur den
-   **Steuerdialog** (es wird **nichts automatisch geladen**) — wie das linke
-   Panel im Web-Viewer:
-   - **Show ice overlay** – ein/aus (Daten bleiben geladen)
-   - **Load data… / Clear** – Datensätze hinzufügen / alle entfernen. Nach dem
-     Laden **springt die Karte automatisch** zu den neuen Daten.
-   - **Datensatzliste** – Checkbox = Sichtbarkeit pro Datensatz; *Zoom to
-     data* (markierter Datensatz, ohne Markierung: alle sichtbaren);
-     *Remove* entfernt den markierten einzeln
+1. Start OpenCPN (`opencpn`).
+2. *Options → Plugins* → tick **S-411 Ice** → *OK*.
+3. A **411** button appears in the toolbar. Clicking it opens only the **control
+   dialog** (**nothing is loaded automatically**) — like the left panel in the
+   web viewer:
+   - **Show ice overlay** – on/off (data stays loaded)
+   - **Load data… / Clear** – add datasets / remove all. After loading, the
+     **chart jumps automatically** to the new data.
+   - **Dataset list** – checkbox = per-dataset visibility; *Zoom to data*
+     (selected dataset, or all visible ones if none selected); *Remove* removes
+     the selected one individually
    - **Display mode** – *Ice concentration* / *Stage of development* /
      *Navigational (ice-class traffic light)*
-   - **Vessel ice class** – nur im Navigational-Modus aktiv (No class …
+   - **Vessel ice class** – active only in navigational mode (No class …
      IA Super)
    - **Colour palette** – *Day* / *Dusk* / *Night*
-   - **Fill opacity** – Deckkraft der Flächenfüllungen
-   - **Legende** – passt sich Modus und Palette an
-   Modus, Eisklasse, Palette und Deckkraft werden gespeichert und beim
-   nächsten Start wiederhergestellt. Denselben Dialog gibt es unter
-   *Options → Plugins → S-411 Ice → Preferences*.
-   Beim **allerersten Öffnen** startet automatisch eine **geführte Tour**
-   (abgedunkeltes Panel, gelb umrandeter Fokus auf je einem Bedienelement,
-   Karte mit *← Back / Next → / Skip*). Später jederzeit über den **?**-Button
-   oben rechts im Panel erneut aufrufbar. Das „gesehen"-Flag wird in der
-   OpenCPN-Config gespeichert (`/PlugIns/S411/TutorialSeen`).
-4. **Feature-Report:** kurzer Klick (ohne Ziehen, < 4 px Mausbewegung) auf
-   ein Eis-Feature öffnet ein Fenster mit allen Attributen; Konzentrations-
-   und Entwicklungsstadium-Codes werden im Klartext decodiert
-   (z. B. `totalConcentration = 92 (10/10)`). Pannen/Zoomen bleibt
-   unverändert; Klick auf freie See tut nichts.
+   - **Fill opacity** – opacity of the area fills
+   - **Legend** – adapts to mode and palette
+   Mode, ice class, palette and opacity are saved and restored on the next
+   start. The same dialog is available under *Options → Plugins → S-411 Ice →
+   Preferences*.
+   On the **very first open** a **guided tour** starts automatically (dimmed
+   panel, a yellow-outlined focus on one control at a time, card with
+   *← Back / Next → / Skip*). Reopen it anytime with the **?** button at the top
+   right of the panel. The "seen" flag is stored in the OpenCPN config
+   (`/PlugIns/S411/TutorialSeen`).
+4. **Feature report:** a short click (no drag, < 4 px mouse movement) on an ice
+   feature opens a window with all attributes; concentration and
+   stage-of-development codes are decoded to plain language
+   (e.g. `totalConcentration = 92 (10/10)`). Panning/zooming is unaffected; a
+   click on open sea does nothing.
 
-### 2.4 Testdaten beschaffen
+### 2.4 Getting test data
 
-Alle Testdatensätze liegen im Portal (Login lt. `.env` des seaice-Projekts):
-**https://31-70-111-123.sslip.io/testdata/** — die Zips dort kann das Plugin
-**direkt laden**, ohne Entpacken. Sinnvolle Auswahl:
+Two datasets ship as fixtures directly in this repo (`tests/fixtures/`). A full
+set of S-411 test datasets lives in the S-411 specification project
+([github.com/aibenk/s411](https://github.com/aibenk/s411)) under
+`S-411_Ed_2.0.0/Annex_G_TestData/` — the plugin can load those zips **directly**,
+without unpacking. A useful selection:
 
-| Download | Testet |
+| Dataset | Exercises |
 |---|---|
-| `TDS4_RealData_Baltic.zip` | echte BSH-Karte, 337 Features, alle Farben |
-| `TDS8_RealData_International.zip` | 5 Produzenten, inkl. **NWS Alaska** (Antimeridian!) |
-| `TDS1_BalticSea_IceChart.zip` | kleiner synthetischer Satz (schneller Smoke-Test) |
-| `TDS6_IceReport_GermanCoast.zip` | Punkt-Features (Eisbericht-Stationen) |
+| `TDS4_RealData_Baltic.zip` | real BSH chart, 337 features, all colours |
+| `TDS8_RealData_International.zip` | 5 producers, incl. **NWS Alaska** (antimeridian!) |
+| `TDS1_BalticSea_IceChart.zip` | small synthetic set (fast smoke test) |
+| `TDS6_IceReport_GermanCoast.zip` | point features (ice-report stations) |
 
-Alternativ liegen dieselben Daten im seaice-Repo unter
-`S-411_Ed_2.0.0/Annex_G_TestData/` (aus WSL erreichbar unter
-`/mnt/c/Users/alexa/VSCode Projects/seaice/...`) sowie zwei Sätze als
-Fixtures direkt in diesem Repo (`tests/fixtures/`).
-
-Für den **Edition-1.x-Test**: einen aktuellen Winter-Satz vom BSH-FTP laden —
-`ftp://ftp.bsh.de/outgoing/eisbericht/S411/Winter2025/` (anonymous) — und das
-Zip unverändert ins Plugin geben.
+For an **Edition 1.x test**: fetch a current winter set from the BSH FTP —
+`ftp://ftp.bsh.de/outgoing/eisbericht/S411/Winter2025/` (anonymous) — and feed
+the zip to the plugin unchanged.
 
 ---
 
-## 3. Test-Checkliste (mit Soll-Ergebnissen)
+## 3. Test checklist (with expected results)
 
-Der 411-Button öffnet den Steuerdialog; geladen wird ausschließlich über
-*Load data…* dort. Zuerst der wichtigste Test — **Georeferenzierung** (der
-historische Fehlerfall „Ostsee-Eis im Indischen Ozean" war eine erzwungene
-lon/lat-Interpretation für Edition-1.x-Dateien):
+The 411 button opens the control dialog; loading happens only via *Load data…*
+there. First the most important test — **georeferencing** (the historical bug
+"Baltic ice in the Indian Ocean" was a forced lon/lat interpretation of
+Edition 1.x files):
 
-| # | Test | Soll |
+| # | Test | Expected |
 |---|---|---|
-| G1 | BSH-Winter-Zip laden (`reference/real_data/S411_ek1-20250220.zip` im seaice-Repo oder frisch vom BSH-FTP) | Karte springt automatisch zur Ostsee; Eis liegt im Bottnischen/Finnischen Meerbusen (~63°N/21°E) — **nicht** am Persischen Golf/Indischen Ozean |
-| G2 | `tests/fixtures/v1_lonlat_crs84.gml` laden | Fläche im Bottnischen Meerbusen (63–64°N, 21–22°E) — lon/lat-Datei, erkennbar **nur** am CRS84-`srsName` (beide Achsen ≤ 90°) |
-| G3 | `tests/fixtures/v1_lonlat.gml` laden | Fläche in der Antarktis (~64°S, 56°W) — lon/lat mit 0–360°-Längen, erkannt und normalisiert |
-| G4 | NWS-Alaska-Karte laden (TDS8 bzw. `international/NWS_Alaska_src/.../S411_NWS_full_20260701.gml`) | Alaska/Beringmeer, Flächen **zusammenhängend** über die Datumsgrenze |
+| G1 | Load a BSH winter zip (from the S-411 project's `reference/real_data/`, or fresh from the BSH FTP) | chart jumps to the Baltic; ice sits in the Bothnian/Gulf of Finland (~63°N/21°E) — **not** the Persian Gulf / Indian Ocean |
+| G2 | Load `tests/fixtures/v1_lonlat_crs84.gml` | area in the Bothnian Bay (63–64°N, 21–22°E) — a lon/lat file recognisable **only** by the CRS84 `srsName` (both axes ≤ 90°) |
+| G3 | Load `tests/fixtures/v1_lonlat.gml` | area in Antarctica (~64°S, 56°W) — lon/lat with 0–360° longitudes, detected and normalised |
+| G4 | Load an NWS Alaska chart (TDS8) | Alaska / Bering Sea, areas **contiguous** across the date line |
 
-Danach die Funktions-Checkliste:
+Then the functional checklist:
 
-| # | Test | Soll |
+| # | Test | Expected |
 |---|---|---|
-| 1 | 411-Button → `TDS1_...zip` wählen | Ostsee-Eiskarte erscheint als Overlay: Konzentrationsfarben (blau=eisfrei … dunkelrot=10/10), **Festeis grau**, schwarze Umrandungen |
-| 2 | Farben mit dem Web-Viewer vergleichen (Portal → Viewer, gleicher Datensatz) | identische Flächenfarben (gleiche Farbtabelle) |
-| 3 | Button aus → wieder an → *Abbrechen* im Dialog | Overlay verschwindet / erscheint wieder, ohne Neuladen |
-| 4 | `TDS4_RealData_Baltic.zip` laden, in die Ostsee zoomen/pannen | flüssiges Pan/Zoom trotz 337 Features (Triangulierung passiert nur beim Laden) |
-| 5 | `TDS8_...zip` laden, zur **Beringstraße/Alaska** navigieren | Eisflächen liegen korrekt beidseits der Datumsgrenze — **keine** weltumspannenden Bänder |
-| 6 | `TDS6_...zip` laden, deutsche Ostseeküste | schwarze Dreiecksmarker an den Stationspositionen |
-| 7 | Entpackten Exchange-Set testen: Zip entpacken, im Dialog die **CATALOG.XML** wählen | gleicher Effekt wie Zip-Laden |
-| 8 | Einzelne `.GML` aus `DATASET_FILES/` wählen | lädt ebenfalls |
-| 9 | **Edition 1.x**: BSH-FTP-Winter-Zip direkt laden | Karte erscheint mit korrekten Farben (iceact→Konzentration, Festeis erkannt) |
-| 10 | Fehlerfall: beliebige Nicht-XML-Datei wählen | Warnhinweis, kein Absturz |
-| 11 | *Options → Display → Advanced → OpenGL* umschalten, Tests 1+4 wiederholen | beide Rendering-Pfade (GL und Nicht-GL) zeigen dasselbe Bild; im Nicht-GL-Modus sind Füllungen ebenfalls halbtransparent |
-| 12 | Geteilter Bildschirm (zweites Chart-Fenster) | Overlay erscheint in beiden Canvases |
-| 13 | Steuerdialog → **Display mode** auf *Stage of development* | Flächen färben nach Entwicklungsstadium (Violett-/Grüntöne) statt Konzentration; Festeis in diesem Modus nach SOD, nicht grau |
-| 14 | **Display mode** *Navigational* + **Vessel ice class** durchschalten | Ampel nach der Solltabelle unten; höhere Eisklasse verschiebt die Grenze (mehr grün). 10/10-Eis bleibt für jede Klasse rot |
-| 15 | **Colour palette** *Dusk* / *Night* durchschalten | Füllungen abgedunkelt; Linien im Night-Modus hell/sichtbar; Legende dimmt mit |
-| 16 | Vergleich mit Web-Viewer (Portal → Viewer, gleicher Datensatz, gleicher Modus/Palette/Eisklasse) | identische Portrayal — Plugin, Viewer und die normative `rules/main.xsl` nutzen seit v0.4.0 nachweislich dieselben Tabellen (CI-Paritätschecks in beiden Repos) |
-| 17 | Klick auf eine Eisfläche (ohne Ziehen) | Feature-Report: Featuretyp, Datensatz, alle Attribute; `totalConcentration`/`stageOfDevelopment` mit Klartext-Label; Klick auf freie See: nichts; Pannen unverändert |
-| 18 | Zweiten Datensatz laden, Checkboxen der Liste umschalten | jeweils nur die angehakten Datensätze werden gezeichnet; *Remove* entfernt einzeln; *Zoom to data* springt zum markierten bzw. zu allen sichtbaren |
-| 19 | **Fill opacity** schieben, OpenCPN neu starten | Deckkraft ändert sich live und ist nach Neustart erhalten |
-| 20 | Robustheit: Kopie von `tests/fixtures/v1_latlon.gml`, `iceact`-Wert auf `9+` oder leer setzen, laden | Fläche **grau „Unknown"** in Nav- und Konzentrations-Modus — nicht rot, nicht grün „eisfrei" |
+| 1 | 411 button → pick `TDS1_...zip` | Baltic ice chart appears as an overlay: concentration colours (blue = ice free … dark red = 10/10), **fast ice grey**, black outlines |
+| 2 | Compare colours with the web viewer (same dataset) | identical area colours (same colour table) |
+| 3 | Button off → on again → *Cancel* in the dialog | overlay disappears / reappears without reloading |
+| 4 | Load `TDS4_RealData_Baltic.zip`, zoom/pan into the Baltic | smooth pan/zoom despite 337 features (triangulation happens only on load) |
+| 5 | Load `TDS8_...zip`, navigate to the **Bering Strait / Alaska** | ice areas sit correctly on both sides of the date line — **no** globe-spanning bands |
+| 6 | Load `TDS6_...zip`, German Baltic coast | black triangular markers at the station positions |
+| 7 | Test an unpacked exchange set: unzip it, pick the **CATALOG.XML** in the dialog | same effect as loading the zip |
+| 8 | Pick a single `.GML` from `DATASET_FILES/` | loads as well |
+| 9 | **Edition 1.x**: load a BSH FTP winter zip directly | chart appears with correct colours (iceact→concentration, fast ice detected) |
+| 10 | Error case: pick any non-XML file | warning, no crash |
+| 11 | Toggle *Options → Display → Advanced → OpenGL*, repeat tests 1+4 | both render paths (GL and non-GL) show the same picture; in non-GL mode fills are semi-transparent too |
+| 12 | Split screen (second chart window) | overlay appears in both canvases |
+| 13 | Control dialog → **Display mode** to *Stage of development* | areas colour by stage of development (purples/greens) instead of concentration; fast ice follows SOD in this mode, not grey |
+| 14 | **Display mode** *Navigational* + step through **Vessel ice class** | traffic light per the reference table below; a higher ice class shifts the boundary (more green). 10/10 ice stays red for every class |
+| 15 | Step through **Colour palette** *Dusk* / *Night* | fills dimmed; lines light/visible in Night mode; legend dims with it |
+| 16 | Compare with the web viewer (same dataset, same mode/palette/ice class) | identical portrayal — plugin, viewer and the normative `rules/main.xsl` use the same tables (CI parity checks in both repos) |
+| 17 | Click an ice area (no drag) | feature report: feature type, dataset, all attributes; `totalConcentration`/`stageOfDevelopment` with plain-language labels; click on open sea: nothing; panning unaffected |
+| 18 | Load a second dataset, toggle the list checkboxes | only the ticked datasets are drawn; *Remove* removes one; *Zoom to data* jumps to the selected one or to all visible ones |
+| 19 | Slide **Fill opacity**, restart OpenCPN | opacity changes live and is kept after a restart |
+| 20 | Robustness: copy `tests/fixtures/v1_latlon.gml`, set the `iceact` value to `9+` or empty, load | area **grey "Unknown"** in nav and concentration mode — not red, not green "ice free" |
 
-**Solltabelle Navigational-Ampel** (Bewertung der maximalen Bedeckung in
-Zehnteln; Entscheidung dokumentiert im seaice-Repo, `docs/DECISIONS.md` #17):
+**Navigational traffic-light reference** (grading the maximum coverage in
+tenths; the decision is documented in the S-411 project, `docs/DECISIONS.md` #17):
 
-| ct | keine Klasse | IB / IC (PC6–7) | IA (PC4–5) | IA Super (PC1–3) |
+| ct | no class | IB / IC (PC6–7) | IA (PC4–5) | IA Super (PC1–3) |
 |---|---|---|---|---|
-| 46 (4–6/10) | gelb | gelb | **grün** | grün |
-| 80 (8/10) | gelb | gelb | gelb | **grün** |
-| 90 (9/10) | rot | rot | rot | **gelb** |
-| 92 (10/10) | rot | rot | rot | rot |
-| 02 (bergy water) | überall hellblau *Open water / bergy water* — nie „Safe (ice free)" | | | |
+| 46 (4–6/10) | amber | amber | **green** | green |
+| 80 (8/10) | amber | amber | amber | **green** |
+| 90 (9/10) | red | red | red | **amber** |
+| 92 (10/10) | red | red | red | red |
+| 02 (bergy water) | light blue *Open water / bergy water* everywhere — never "Safe (ice free)" | | | |
 
-**Ice-Routing (v0.5.0):**
+**Ice routing (v0.5.0):**
 
-| # | Test | Soll |
+| # | Test | Expected |
 |---|---|---|
-| 21 | Datensatz laden, im Panel unten **Start → Set…**, auf die Karte klicken; dann **End → Set…**, klicken | die zwei Positionen erscheinen als Koordinaten im Panel |
-| 22 | **Vessel ice class** wählen, **Compute ice route** | eine Route erscheint in OpenCPN (Route-Manager), die um rote (hazardous) Eisflächen herumführt; Statuszeile nennt Distanz, Meilen in Caution-Eis und Etappenzahl |
-| 23 | Eisklasse von *No class* auf *IA Super* ändern, erneut Compute | die Route darf mehr Eis durchqueren (höhere Klasse → mehr grün/gelb passierbar) |
-| 24 | Start oder Ziel mitten in dichtem Eis setzen, Compute | der Router lässt das Startfeld verlassen; liegt das **Ziel** komplett im roten Eis, klare Fehlermeldung |
-| 25 | Kanal komplett durch Eis versperrt, Compute | Meldung „No route: …" statt Absturz oder Route quer durchs Eis |
-| 26 | **Avoid caution ice too** anhaken, Compute | die Route meidet zusätzlich gelbe Flächen (oder meldet, dass keine offene Passage bleibt) |
-| 27 | *(nur mit ocpn_draw_pi installiert)* **Export no-go zones** | Meldung „Exported N …"; in ocpn_draw erscheinen rote Exclusion-Grenzen um das gefährliche Eis; erneuter Export ersetzt nur die eigenen, eigene ocpn_draw-Grenzen des Nutzers bleiben |
-| 28 | Danach Weather Routing: *Configuration → Detect Boundary* an, Route rechnen | die Wetter-Route umfährt die exportierten Eiszonen |
-| 29 | *Export no-go zones* **ohne** ocpn_draw_pi | Hinweis, dass ocpn_draw_pi fehlt — kein Absturz |
+| 21 | Load a dataset; in the panel, **Start → Set…**, click the chart; then **End → Set…**, click | the two positions appear as coordinates in the panel |
+| 22 | Pick a **Vessel ice class**, **Compute ice route** | a route appears in OpenCPN (route manager) that goes around red (hazardous) ice; the status line reports distance, miles through caution ice and the number of legs |
+| 23 | Change the ice class from *No class* to *IA Super*, Compute again | the route may cross more ice (higher class → more green/amber passable) |
+| 24 | Set the start or destination in the middle of dense ice, Compute | the router lets the track leave the start cell; if the **destination** is entirely in red ice, a clear error message |
+| 25 | Channel completely sealed by ice, Compute | message "No route: …" instead of a crash or a route straight through the ice |
+| 26 | Tick **Avoid caution ice too**, Compute | the route also avoids amber areas (or reports that no open passage remains) |
+| 27 | *(only with ocpn_draw_pi installed)* **Export no-go zones** | message "Exported N …"; red exclusion boundaries appear in ocpn_draw around the hazardous ice; re-exporting replaces only its own, the user's own ocpn_draw boundaries stay |
+| 28 | Then Weather Routing: *Configuration → Detect Boundary* on, compute a route | the weather route avoids the exported ice zones |
+| 29 | *Export no-go zones* **without** ocpn_draw_pi | a note that ocpn_draw_pi is missing — no crash |
 
-Der Router arbeitet auf den **sichtbaren** Datensätzen und der oben gewählten
-**Vessel ice class**; er nutzt die identische Ampel-Logik wie die Darstellung.
-Ab v0.6.0 wird der Suchkorridor bei „keine Route im Korridor" automatisch
-geweitet (×2/×4), und eine erneute Berechnung **ersetzt** die vorige Eisroute
-statt sie zu stapeln.
+The router works on the **visible** datasets and the **vessel ice class**
+selected above; it uses the same traffic-light logic as the display. Since
+v0.6.0 the search corridor is automatically widened (×2/×4) on "no route in the
+corridor", and recomputing **replaces** the previous ice route instead of
+stacking it.
 
-**Bekannte Grenzen (v0.6.0, kein Fehler):** Punkt-Features als generische
-Dreiecke statt Annex-C-Symbole, Linien-Strichmuster sind Näherungen; bei
-geteiltem Bildschirm nutzt der Feature-Report den zuletzt gezeichneten
-Canvas-Viewport. Der Router sucht in einem Korridor um Start/Ziel (kein
-globales Routing über große Ozeanbecken); Start/Ziel oberhalb 85° werden
-abgelehnt. **10/10-Eis (und Festeis) gilt für JEDE Eisklasse als unpassierbar**
-— bewusst identisch zur Ampel-Darstellung; im Hochwinter kann daher „keine
-Route" die korrekte Antwort sein. (Ein durchlässiger Modus für Höchst-
-Eisklassen mit hoher Strafe wäre eine mögliche künftige Option.)
+**Known limits (v0.6.0, not bugs):** point features are drawn as generic
+triangles rather than Annex C symbols, line dash patterns are approximations,
+and on a split screen the feature report uses the last-drawn canvas viewport.
+The router searches a corridor around start/destination (no global routing
+across large ocean basins); start/destination above 85° are rejected. **10/10
+ice (and fast ice) is impassable for every ice class** — deliberately identical
+to the traffic-light display; in deep winter "no route" can therefore be the
+correct answer. (A permeable mode for the highest ice classes with a heavy
+penalty would be a possible future option.)
 
 ---
 
-## 4. Nativer Windows-Build (ein Befehl)
+## 4. Native Windows build (one command)
 
-Voraussetzungen: Visual Studio 2022 mit C++-Workload, OpenCPN (Windows-Build,
-32-bit) installiert. Dann im Repo:
+Prerequisites: Visual Studio 2022 with the C++ workload, OpenCPN (Windows build,
+32-bit) installed. Then, in the repo:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File buildwin.ps1 -Package
 ```
 
-Das Skript lädt beim ersten Lauf das passende wxWidgets-3.2.9-vc14x-SDK
-(~35 MB), erzeugt die OpenCPN-Importbibliothek **direkt aus der installierten
-`opencpn.exe`** (dumpbin → .def → lib — kein separates SDK nötig), kompiliert
-Win32/`/MD` gegen dieselben wx-DLLs, die OpenCPN mitbringt, und baut
+On the first run the script downloads the matching wxWidgets 3.2.9-vc14x SDK
+(~35 MB), builds the OpenCPN import library **directly from the installed
+`opencpn.exe`** (dumpbin → .def → lib — no separate SDK needed), compiles
+Win32/`/MD` against the same wx DLLs OpenCPN ships, and builds
 
 ```
 dist\s411_pi-<version>-msvc-wx32-win32.tar.gz
 ```
 
-— ein Import-Paket im Format des OpenCPN-Plugin-Managers (metadata.xml mit
-`target: msvc-wx32`, DLL unter `plugins/`).
+— an import package in the OpenCPN plugin-manager format (metadata.xml with
+`target: msvc-wx32`, DLL under `plugins/`).
 
-**Installation über den Plugin-Manager:** OpenCPN → *Options → Plugins* →
-**Import plugin…** → das `.tar.gz` aus `dist\` wählen → Plugin **S-411 Ice**
-in der Liste aktivieren.
+**Install via the plugin manager:** OpenCPN → *Options → Plugins* →
+**Import plugin…** → pick the `.tar.gz` from `dist\` → enable **S-411 Ice** in
+the list.
 
-**Deinstallation:** OpenCPN → *Options → Plugins* → **S-411 Ice** anklicken →
-**Uninstall**. Das Plugin lädt von sich aus nie Daten (auch nicht beim Start);
-Deaktivieren oder Deinstallieren entfernt das Overlay sofort und gibt allen
-Speicher frei. Falls einmal Reste bleiben (z.B. die DLL war gesperrt, weil
-OpenCPN lief): OpenCPN schließen und
-`powershell -ExecutionPolicy Bypass -File packaging\uninstall.ps1` ausführen —
-das entfernt DLL und die Registrierung sauber. **Vor dem Import einer neuen
-Version** die alte so deinstallieren.
+**Uninstall:** OpenCPN → *Options → Plugins* → click **S-411 Ice** →
+**Uninstall**. The plugin never loads data on its own (not even at start);
+disabling or uninstalling removes the overlay immediately and frees all memory.
+If anything is left behind (e.g. the DLL was locked because OpenCPN was
+running): close OpenCPN and run
+`powershell -ExecutionPolicy Bypass -File packaging\uninstall.ps1` — it removes
+the DLL and the registration cleanly. **Before importing a new version**,
+uninstall the old one this way.
 
-Alternativ kopiert `buildwin.ps1 -Install` die DLL direkt nach
-`C:\Program Files (x86)\OpenCPN\plugins\` (UAC) — dann aber **nicht beides**:
-entweder Import ODER Direktkopie, sonst wird das Plugin doppelt gefunden.
+Alternatively, `buildwin.ps1 -Install` copies the DLL straight to
+`C:\Program Files (x86)\OpenCPN\plugins\` (UAC) — but then **not both**: either
+Import OR direct copy, otherwise the plugin is found twice.
 
-Nach einem OpenCPN-**Update** `sdk\opencpn.lib` löschen und das Skript neu
-laufen lassen (die Importbibliothek muss zur neuen exe passen).
+After an OpenCPN **update**, delete `sdk\opencpn.lib` and re-run the script (the
+import library must match the new exe).
 
 ---
 
-## 5. Befunde melden
+## 5. Reporting findings
 
-Bitte pro Befund notieren: Testnummer aus der Checkliste, Datensatz,
-OpenGL an/aus, Screenshot. Bei Lade-Problemen zusätzlich die Meldung aus dem
-Warnhinweis-Dialog — sie enthält Datei und Ursache pro fehlgeschlagener Datei.
+Please note, per finding: the test number from the checklist, the dataset,
+OpenGL on/off, a screenshot. For load problems, also the message from the
+warning dialog — it contains the file and cause for each failed file.
