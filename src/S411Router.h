@@ -33,7 +33,7 @@ struct S411RouteParams {
   bool avoidCaution = false;     // treat amber as impassable
   double cautionPenalty = 4.0;   // cost multiplier inside amber ice
   double mildPenalty = 1.15;     // slight preference for open water
-  int maxDim = 220;              // max raster cells per axis
+  int maxDim = 200;              // max raster cells per axis (matches viewer/QGIS)
   double marginFrac = 0.30;      // corridor margin around the start-end box
   double minMarginDeg = 0.8;
 };

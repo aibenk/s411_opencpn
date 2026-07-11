@@ -13,6 +13,8 @@
  ***************************************************************************/
 #pragma once
 
+#include <cmath>
+
 #include <wx/string.h>
 
 struct S411Rgb {
@@ -48,8 +50,12 @@ inline S411Rgb S411TokenRgb(const wxString &token, S411Palette pal) {
     return {230, 230, 230};
   const double f = pal == S411Palette::Day ? 1.0
                  : pal == S411Palette::Dusk ? 0.5 : 0.2;
-  return {(unsigned char)(rgb.r * f), (unsigned char)(rgb.g * f),
-          (unsigned char)(rgb.b * f)};
+  // round half-to-even to match the model's int(round(c*f)) exactly
+  // (std::nearbyint uses the default FE_TONEAREST mode); truncation was off by
+  // one on ~17 dusk/night channels vs the generated colour profile.
+  return {(unsigned char)std::nearbyint(rgb.r * f),
+          (unsigned char)std::nearbyint(rgb.g * f),
+          (unsigned char)std::nearbyint(rgb.b * f)};
 }
 
 // total concentration code -> colour token (S-411 CONC_CLASS)

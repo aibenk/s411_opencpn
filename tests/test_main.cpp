@@ -256,6 +256,22 @@ int main(int argc, char **argv) {
     Check(night.r < day.r, "night palette dims the fill");
     S411Rgb ln = S411TokenRgb("ICELIN", S411Palette::Night);
     Check(ln.r > 200, "night ICELIN stays light (visible lines)");
+
+    // exact numeric parity with the model's colour profile (round half-to-even,
+    // not truncation): these three tripped the old truncation bug
+    S411Rgb duskC46 = S411TokenRgb("ICEC46", S411Palette::Dusk);
+    Check(duskC46.r == 128 && duskC46.g == 128 && duskC46.b == 0,
+          "dusk ICEC46 = 128,128,0 (rounded, not truncated 127)");
+    S411Rgb nightUnk = S411TokenRgb("ICEUNK", S411Palette::Night);
+    Check(nightUnk.r == 46 && nightUnk.g == 46 && nightUnk.b == 46,
+          "night ICEUNK = 46,46,46 (rounded, not truncated 45)");
+    S411Rgb duskFre = S411TokenRgb("ICEFRE", S411Palette::Dusk);
+    Check(duskFre.r == 0 && duskFre.g == 50 && duskFre.b == 128,
+          "dusk ICEFRE = 0,50,128");
+
+    // router default parameters must match the viewer/QGIS ports
+    Check(S411RouteParams().maxDim == 200,
+          "router default maxDim = 200 (matches viewer/QGIS)");
   }
 
   // --- 9: ice-aware router -------------------------------------------------
