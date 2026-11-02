@@ -37,8 +37,16 @@ if (-not (Test-Path "$sdk\wx\lib\vc14x_dll")) {
     $base = "https://github.com/wxWidgets/wxWidgets/releases/download/v3.2.9"
     Invoke-WebRequest "$base/wxWidgets-3.2.9-headers.7z" -OutFile "$sdk\headers.7z"
     Invoke-WebRequest "$base/wxMSW-3.2.9_vc14x_Dev.7z" -OutFile "$sdk\dev.7z"
-    tar -xf "$sdk\headers.7z" -C "$sdk\wx"   # Windows bsdtar reads 7z
-    tar -xf "$sdk\dev.7z" -C "$sdk\wx"
+    # 7-Zip if present (preinstalled on GitHub's Windows runners, whose
+    # bsdtar lacks the LZMA codec); otherwise Windows' bsdtar reads 7z
+    $sevenZip = @((Get-Command 7z -ErrorAction SilentlyContinue).Source,
+                  "C:\Program Files\7-Zip\7z.exe") | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    foreach ($a in "headers.7z", "dev.7z") {
+        if ($sevenZip) { & $sevenZip x -y -bso0 "-o$sdk\wx" "$sdk\$a" }
+        else { tar -xf "$sdk\$a" -C "$sdk\wx" }
+        if ($LASTEXITCODE -ne 0) { throw "could not unpack $a" }
+    }
+    if (-not (Test-Path "$sdk\wx\include\wx\string.h")) { throw "wxWidgets SDK incomplete after unpacking" }
 }
 
 if (-not $TestOnly) {
