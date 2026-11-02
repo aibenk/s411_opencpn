@@ -180,6 +180,25 @@ bool S411LoadSigrid(const std::string &shp, const std::string &dbfBytes,
     f.totalConcentration = ct;
     if (iSA >= 0) f.stageOfDevelopment = Code(dbf.Get(idx, iSA));
     if (iFA >= 0) f.fastIce = Code(dbf.Get(idx, iFA)) == "08";
+    // egg code: CT; CA/SA/FA, CB/SB/FB, CC/SC/FC; SO left, SD right
+    f.egg.ct = ct;
+    auto field = [&](const char *n) {
+      const int i = dbf.Index(n);
+      return i >= 0 ? Code(dbf.Get(idx, i)) : wxString();
+    };
+    if (ct != "98" && ct != "01" && ct != "02") {
+      const char *cols[3][3] = {{"CA", "SA", "FA"}, {"CB", "SB", "FB"},
+                                {"CC", "SC", "FC"}};
+      for (auto &c : cols) {
+        S411EggColumn col;
+        col.c = field(c[0]);
+        const wxString st = field(c[1]), fm = field(c[2]);
+        if (!st.IsEmpty() || !fm.IsEmpty()) col.sf.push_back({st, fm});
+        if (!col.c.IsEmpty() || !col.sf.empty()) f.egg.cols.push_back(col);
+      }
+      f.egg.so = field("SO");
+      f.egg.sd = field("SD");
+    }
     for (size_t k = 0; k < dbf.names.size(); k++) {
       const wxString v = dbf.Get(idx, k);
       if (!v.IsEmpty() && !v.StartsWith("-9")) f.attrs.push_back({dbf.names[k], v});

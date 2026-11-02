@@ -27,6 +27,21 @@ struct S411Pos {
 
 enum class S411Kind { Point, Line, Area };
 
+/** WMO egg code of an ice area (PS Figure 3.1): Ct on top, up to three
+ *  columns Ca/Sa/Fa, Cb/Sb/Fb, Cc/Sc/Fc, So (trace of older ice) left and
+ *  Sd (remaining stage) / strips concentration right. Values are the IOC
+ *  codes as in the data (e.g. "92", "91", "08"), like the S-411 viewer. */
+struct S411EggColumn {
+  wxString c;                                   // partial concentration
+  std::vector<std::pair<wxString, wxString>> sf;  // (stage, form), thickest 1st
+  wxString breccia, brecciaStage;
+};
+struct S411Egg {
+  wxString ct, so, sd, cs;
+  std::vector<S411EggColumn> cols;              // at most three
+  bool Empty() const { return ct.IsEmpty() && cols.empty(); }
+};
+
 struct S411Feature {
   wxString type;                              // Edition 2.0.0 feature name
   S411Kind kind = S411Kind::Area;
@@ -42,6 +57,7 @@ struct S411Feature {
   // every non-geometry leaf element (local name -> text, document order),
   // shown verbatim in the on-click feature report
   std::vector<std::pair<wxString, wxString>> attrs;
+  S411Egg egg;                                // ice areas only
   // points: Annex C symbol name (e.g. ICEBRG03) and the PS clause 9.7 value
   // text ("35 cm", "0.5 kn"), both resolved at load time
   wxString symbol;

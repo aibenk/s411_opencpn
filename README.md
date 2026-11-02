@@ -99,8 +99,9 @@ name is used and marked as approximate.
 
 ## Status
 
-**v0.8.0 — beta.** Implements the improvement backlog of the v0.7.0 test
-report ([IMPROVEMENTS.md](IMPROVEMENTS.md)). The parsing/loading pipeline is
+**v0.8.1 — beta.** v0.8.1 adds the WMO egg code graphic to the feature
+report (from S-411 2.0.0, 1.x and SIGRID-3 data). v0.8.0 implemented the
+improvement backlog of the v0.7.0 test report ([IMPROVEMENTS.md](IMPROVEMENTS.md)). The parsing/loading pipeline is
 exercised in CI (Linux and Windows) against **real operational datasets**
 (BSH Baltic, NWS Alaska across 180°, NIC Arctic around the pole, ice-report
 stations, signed exchange sets as directory and zip) and against the golden
@@ -190,7 +191,7 @@ cmake -B build && cmake --build build
 
 `packaging/metadata.xml` points `tarball-url` at the GitHub release asset
 `v<version>/s411_pi-<version>-msvc-wx32-win32.tar.gz`. To publish: build with
-`buildwin.ps1 -Package`, then `gh release create v0.8.0 dist/*.tar.gz` (plus
+`buildwin.ps1 -Package`, then `gh release create v<version> dist/*.tar.gz` (plus
 the Linux `libs411_pi.so` artifact from CI). The repository must be public for
 the OpenCPN plugin catalogue to fetch it.
 

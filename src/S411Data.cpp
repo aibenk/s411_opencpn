@@ -558,6 +558,75 @@ void S411FinishFeature(S411Feature &f) {
   BuildMercator(f);
 }
 
+// --- WMO egg code -----------------------------------------------------------
+static wxString ChildText(const wxXmlNode *n, const wxString &loc) {
+  for (const wxXmlNode *c = n->GetChildren(); c; c = c->GetNext())
+    if (IsElem(c) && Local(c) == loc)
+      return c->GetNodeContent().Trim().Trim(false);
+  return "";
+}
+
+// "[95, 87]" / "95" -> {"95", "87"} (Edition 1.x S-57 style lists)
+static std::vector<wxString> V1List(wxString v) {
+  std::vector<wxString> out;
+  v.Replace("[", "");
+  v.Replace("]", "");
+  wxStringTokenizer tk(v, ",", wxTOKEN_STRTOK);
+  while (tk.HasMoreTokens()) {
+    wxString t = tk.GetNextToken().Trim().Trim(false);
+    if (t.length() == 1 && wxIsdigit(t[0])) t = "0" + t;
+    out.push_back(t);
+  }
+  return out;
+}
+
+static void ParseEgg(const wxXmlNode *node, const ParseCtx &ctx,
+                     S411Feature &f) {
+  S411Egg &e = f.egg;
+  e.ct = f.totalConcentration;
+  if (ctx.v1) {  // parallel lists iceapc=[Ca..] icesod=[Sa..] iceflz=[Fa..]
+    if (e.ct == "98" || e.ct == "01" || e.ct == "02") return;
+    const wxXmlNode *a = FindDesc(node, "iceapc"), *s = FindDesc(node, "icesod"),
+                    *fz = FindDesc(node, "iceflz");
+    const auto apc = V1List(a ? a->GetNodeContent() : wxString());
+    const auto sod = V1List(s ? s->GetNodeContent() : wxString());
+    const auto flz = V1List(fz ? fz->GetNodeContent() : wxString());
+    const size_t n = std::min<size_t>(3, std::max({apc.size(), sod.size(),
+                                                   flz.size()}));
+    for (size_t i = 0; i < n; i++) {
+      S411EggColumn col;
+      if (i < apc.size()) col.c = CleanConcV1(apc[i]);
+      const wxString st = i < sod.size() ? sod[i] : wxString();
+      const wxString fm = i < flz.size() ? flz[i] : wxString();
+      if (!st.IsEmpty() || !fm.IsEmpty()) col.sf.push_back({st, fm});
+      if (!col.c.IsEmpty() || !col.sf.empty()) e.cols.push_back(col);
+    }
+    return;
+  }
+  for (const wxXmlNode *g = node->GetChildren(); g; g = g->GetNext()) {
+    if (!IsElem(g)) continue;
+    const wxString loc = Local(g);
+    if (loc != "iceCharacteristic" && loc != "lakeIceCharacteristic") continue;
+    if (e.cols.size() == 3) break;
+    S411EggColumn col;
+    col.c = ChildText(g, "partialConcentration");
+    for (const wxXmlNode *d = g->GetChildren(); d; d = d->GetNext()) {
+      if (!IsElem(d)) continue;
+      const wxString dl = Local(d);
+      if (dl != "developmentAndForm" && dl != "lakeDevelopmentAndForm") continue;
+      wxString st = ChildText(d, "stageOfDevelopment");
+      if (st.IsEmpty()) st = ChildText(d, "lakeIceStageOfDevelopment");
+      col.sf.push_back({st, ChildText(d, "formOfIce")});
+    }
+    col.breccia = ChildText(g, "iceBreccia");
+    col.brecciaStage = ChildText(g, "brecciaConsolidatingStage");
+    e.cols.push_back(col);
+  }
+  e.so = ChildText(node, "olderIceStage");
+  e.sd = ChildText(node, "remainingIceStage");
+  e.cs = ChildText(node, "stripsPatchesConcentration");
+}
+
 static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
                          const ParseCtx &ctx, S411Dataset &ds) {
   S411Feature f;
@@ -599,6 +668,9 @@ static void ParseFeature(const wxXmlNode *node, const wxXmlNode *geom,
     f.fastIce = AnyDescTextContains(node, "formOfIce", "09", "");
   }
   CollectAttrs(node, geom, f.attrs);
+  if (f.kind == S411Kind::Area &&
+      (f.type == "SeaIce" || f.type == "LakeIce" || f.type == "StripsAndPatches"))
+    ParseEgg(node, ctx, f);
 
   if (f.kind == S411Kind::Point) {
     auto attr = [&f](const char *a, const char *b) {

@@ -28,6 +28,7 @@
 class S411CtrlDialog;
 class S411LoadTimer;
 class S411Worker;
+class S411EggPanel;
 struct S411Painter;
 
 class s411_pi : public opencpn_plugin_116 {
@@ -162,6 +163,7 @@ private:
   S411CtrlDialog *m_dialog = nullptr;
   wxDialog *m_report = nullptr;        // non-modal pick report
   wxTextCtrl *m_reportText = nullptr;
+  S411EggPanel *m_reportEgg = nullptr;  // WMO egg code of the picked areas
   PlugIn_ViewPort m_lastVp;            // viewport of the last render pass
   bool m_haveVp = false;
   wxPoint m_downPos;                   // click-vs-drag discrimination

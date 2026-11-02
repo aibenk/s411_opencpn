@@ -1,6 +1,6 @@
 <plugin version="1">
   <name>s411_pi</name>
-  <version>0.8.0</version>
+  <version>0.8.1</version>
   <release>1</release>
   <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
   <api-version>1.16</api-version>
@@ -19,5 +19,5 @@ services. Also reads SIGRID-3 shapefiles.</description>
   <target>msvc-wx32</target>
   <target-version>10</target-version>
   <target-arch>x86</target-arch>
-  <tarball-url>https://github.com/aibenk/s411_opencpn/releases/download/v0.8.0/s411_pi-0.8.0-msvc-wx32-win32.tar.gz</tarball-url>
+  <tarball-url>https://github.com/aibenk/s411_opencpn/releases/download/v0.8.1/s411_pi-0.8.1-msvc-wx32-win32.tar.gz</tarball-url>
 </plugin>

@@ -76,6 +76,100 @@ private:
 };
 
 // ===========================================================================
+// WMO egg code for the pick report: the same drawing as the S-411 web viewer
+// (spec Figure 3.1) - a tall oval tinted with the concentration colour, Ct
+// on top, the Ca/Cb/Cc, Sa/Sb/Sc, Fa/Fb/Fc columns inside, So to the left
+// and Sd / strips concentration to the right. Geometry in the viewer's
+// 224 x 196 units, scaled to the panel.
+// ===========================================================================
+class S411EggPanel : public wxPanel {
+public:
+  explicit S411EggPanel(wxWindow *parent) : wxPanel(parent) {
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    Bind(wxEVT_PAINT, &S411EggPanel::OnPaint, this);
+  }
+  void SetEggs(std::vector<std::pair<S411Egg, wxString>> eggs) {
+    m_eggs = std::move(eggs);
+    const int n = (int)m_eggs.size();
+    SetMinSize(n ? wxSize(n * kW + (n - 1) * 8, kH + 18) : wxSize(0, 0));
+    Show(n > 0);
+    Refresh();
+  }
+
+private:
+  static const int kW = 224, kH = 196;
+
+  void OnPaint(wxPaintEvent &) {
+    wxAutoBufferedPaintDC dc(this);
+    dc.SetBackground(wxBrush(GetBackgroundColour()));
+    dc.Clear();
+    wxGraphicsContext *gc = wxGraphicsContext::Create(dc);
+    if (!gc) return;
+    for (size_t i = 0; i < m_eggs.size(); i++)
+      Draw(gc, (double)i * (kW + 8), m_eggs[i].first, m_eggs[i].second);
+    delete gc;
+  }
+
+  // text centred on x with its baseline at y (viewer coordinates)
+  void Text(wxGraphicsContext *gc, double ox, double x, double y,
+            const wxString &t, int px, bool bold, const wxColour &c) {
+    if (t.IsEmpty()) return;
+    wxFont f(wxFontInfo(wxSize(0, px)).Family(wxFONTFAMILY_SWISS).Bold(bold));
+    gc->SetFont(f, c);
+    double w, h, desc, lead;
+    gc->GetTextExtent(t, &w, &h, &desc, &lead);
+    gc->DrawText(t, ox + x - w / 2, y - (h - desc));
+  }
+
+  void Draw(wxGraphicsContext *gc, double ox, const S411Egg &d,
+            const wxString &label) {
+    const wxColour navy(0, 0, 76), grey(74, 91, 106), side(58, 75, 90);
+    const double cx = 113, cy = 98, rx = 62, ry = 86;
+    gc->SetPen(wxPen(navy, 2));
+    gc->SetBrush(wxBrush(wxColour(253, 248, 230)));
+    gc->DrawEllipse(ox + cx - rx, cy - ry, 2 * rx, 2 * ry);
+    const S411Rgb t = S411TokenRgb(
+        d.ct.IsEmpty() ? wxString("ICEUNK") : S411ConcToken(d.ct),
+        S411Palette::Day);
+    gc->SetPen(*wxTRANSPARENT_PEN);
+    gc->SetBrush(wxBrush(wxColour(t.r, t.g, t.b, 56)));  // 0.22 opacity
+    gc->DrawEllipse(ox + cx - rx, cy - ry, 2 * rx, 2 * ry);
+    wxPen dash(wxColour(0, 0, 76, 68), 1, wxPENSTYLE_SHORT_DASH);
+    gc->SetPen(dash);
+    for (double y : {50.0, 90.0, 134.0})
+      gc->StrokeLine(ox + 8, y, ox + 216, y);
+    for (double x : {96.0, 131.0, 166.0})
+      gc->StrokeLine(ox + x, 52, ox + x, 178);
+
+    Text(gc, ox, cx, 32, d.ct, 17, true, navy);
+    const double xs[3] = {78, 113, 148};
+    for (size_t i = 0; i < d.cols.size() && i < 3; i++) {
+      const S411EggColumn &col = d.cols[i];
+      Text(gc, ox, xs[i], 68, col.c, 14, false, wxColour(10, 26, 42));
+      for (size_t k = 0; k < col.sf.size(); k++) {
+        const bool big = k == 0;
+        const double dy = 12.0 * k;
+        Text(gc, ox, xs[i], 112 + dy, col.sf[k].first, big ? 14 : 10, big,
+             big ? navy : grey);
+        Text(gc, ox, xs[i], 156 + dy, col.sf[k].second, big ? 14 : 10, big,
+             big ? navy : grey);
+      }
+      if (!col.breccia.IsEmpty())
+        Text(gc, ox, xs[i], 171,
+             "brc" + (col.brecciaStage.IsEmpty() ? wxString()
+                                                 : ":" + col.brecciaStage),
+             9, false, wxColour(138, 90, 0));
+    }
+    Text(gc, ox, 24, 112, d.so, 14, true, navy);
+    Text(gc, ox, 190, 68, d.cs, 13, false, side);
+    Text(gc, ox, 190, 112, d.sd, 13, false, side);
+    Text(gc, ox, cx, kH + 12, label, 11, false, grey);
+  }
+
+  std::vector<std::pair<S411Egg, wxString>> m_eggs;
+};
+
+// ===========================================================================
 // legend for the active display mode / palette (mirrors the web viewer)
 // ===========================================================================
 class S411LegendPanel : public wxPanel {
@@ -160,8 +254,8 @@ public:
                 wxBORDER_NONE | wxFULL_REPAINT_ON_RESIZE),
         m_host(host) {
     SetBackgroundStyle(wxBG_STYLE_PAINT);
-    m_back = new wxButton(this, wxID_ANY, "← Back");
-    m_next = new wxButton(this, wxID_ANY, "Next →");
+    m_back = new wxButton(this, wxID_ANY, L"\u2190 Back");
+    m_next = new wxButton(this, wxID_ANY, L"Next \u2192");
     m_skip = new wxButton(this, wxID_ANY, "Skip");
     m_back->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Go(-1); });
     m_next->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) { Go(+1); });
@@ -252,7 +346,7 @@ private:
     const int by = m_capBox.GetBottom() - pad - btnH + 1;
     int rx = m_capBox.GetRight() - pad;
     const bool last = m_idx + 1 >= (int)m_steps.size();
-    m_next->SetLabel(last ? "Finish" : "Next →");
+    m_next->SetLabel(last ? L"Finish" : L"Next \u2192");
     for (wxButton *btn : {m_next, m_back}) {
       const int w = btn->GetBestSize().x;
       rx -= w;
@@ -330,8 +424,8 @@ public:
     s->Add(m_show, 0, wxALL, b);
 
     auto *btns = new wxBoxSizer(wxHORIZONTAL);
-    m_loadBtn = new wxButton(this, wxID_ANY, "Load data…");
-    m_download = new wxButton(this, wxID_ANY, "Current charts…");
+    m_loadBtn = new wxButton(this, wxID_ANY, L"Load data\u2026");
+    m_download = new wxButton(this, wxID_ANY, L"Current charts\u2026");
     m_download->SetToolTip(
         "Download the newest S-411 chart of every ice service (BSH Ice "
         "Portal) and load it");
@@ -431,14 +525,14 @@ public:
             wxALIGN_CENTRE_VERTICAL);
     m_startLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
     rg->Add(m_startLbl, 1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
-    m_pickStart = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
+    m_pickStart = new wxButton(this, wxID_ANY, L"Set\u2026", wxDefaultPosition,
                                wxSize(56, -1));
     rg->Add(m_pickStart, 0);
     rg->Add(new wxStaticText(this, wxID_ANY, "End"), 0,
             wxALIGN_CENTRE_VERTICAL);
     m_endLbl = new wxStaticText(this, wxID_ANY, "(click the map)");
     rg->Add(m_endLbl, 1, wxALIGN_CENTRE_VERTICAL | wxEXPAND);
-    auto *pickE = new wxButton(this, wxID_ANY, "Set…", wxDefaultPosition,
+    auto *pickE = new wxButton(this, wxID_ANY, L"Set\u2026", wxDefaultPosition,
                                wxSize(56, -1));
     rg->Add(pickE, 0);
     s->Add(rg, 0, wxEXPAND | wxALL, b);
@@ -555,7 +649,7 @@ public:
     }
     const bool layout = m_gauge->IsShown() != busy;
     m_gauge->Show(busy);
-    m_loadBtn->SetLabel(busy ? "Cancel loading" : "Load data…");
+    m_loadBtn->SetLabel(busy ? L"Cancel loading" : L"Load data\u2026");
     m_download->Enable(!busy);
     if (!busy || layout) {
       RebuildList();
@@ -1296,7 +1390,7 @@ bool s411_pi::MouseEventHook(wxMouseEvent &ev) {
 void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
                              double lon) {
   wxString txt = wxString::Format(
-      "Position  %.4f°%s  %.4f°%s\n\n", std::fabs(lat),
+      L"Position  %.4f\u00b0%s  %.4f\u00b0%s\n\n", std::fabs(lat),
       lat >= 0 ? "N" : "S", std::fabs(lon), lon >= 0 ? "E" : "W");
   for (const auto &h : hits) {
     txt += h.feature->type;
@@ -1335,12 +1429,15 @@ void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
                             wxSize(400, 340),
                             wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
     auto *s = new wxBoxSizer(wxVERTICAL);
+    m_reportEgg = new S411EggPanel(m_report);
+    s->Add(m_reportEgg, 0, wxALIGN_CENTRE_HORIZONTAL | wxTOP, 8);
     m_reportText =
         new wxTextCtrl(m_report, wxID_ANY, "", wxDefaultPosition,
                        wxDefaultSize,
                        wxTE_MULTILINE | wxTE_READONLY | wxTE_DONTWRAP);
     m_reportText->SetFont(wxFont(9, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL,
                                  wxFONTWEIGHT_NORMAL));
+    m_reportText->SetMinSize(wxSize(400, 260));
     s->Add(m_reportText, 1, wxEXPAND | wxALL, 5);
     auto *close = new wxButton(m_report, wxID_CLOSE, "Close");
     s->Add(close, 0, wxALIGN_RIGHT | wxALL, 5);
@@ -1350,6 +1447,16 @@ void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
                    [this](wxCloseEvent &) { m_report->Hide(); });
   }
   m_reportText->SetValue(txt);
+  // WMO egg of every picked ice area that carries egg-code data (max three)
+  std::vector<std::pair<S411Egg, wxString>> eggs;
+  for (const auto &h : hits)
+    if (h.feature->kind == S411Kind::Area && !h.feature->egg.Empty() &&
+        eggs.size() < 3)
+      eggs.push_back({h.feature->egg, h.feature->type});
+  m_reportEgg->SetEggs(eggs);
+  m_report->SetMinSize(wxSize(420, eggs.empty() ? 340 : 560));
+  m_report->Layout();
+  m_report->Fit();
   m_report->Show();
   m_report->Raise();
 }
@@ -1386,7 +1493,7 @@ void s411_pi::DeleteOurBoundaries() {
 // routing
 // ---------------------------------------------------------------------------
 static wxString PosLabel(const S411Pos &p) {
-  return wxString::Format("%.4f°%s  %.4f°%s", std::fabs(p.lat),
+  return wxString::Format(L"%.4f\u00b0%s  %.4f\u00b0%s", std::fabs(p.lat),
                           p.lat >= 0 ? "N" : "S", std::fabs(p.lon),
                           p.lon >= 0 ? "E" : "W");
 }
@@ -1503,7 +1610,7 @@ static wxString DegMin(double v, bool lat) {
   const char h = lat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
   v = std::fabs(v);
   const int d = (int)v;
-  return wxString::Format(lat ? "%02d°%04.1f'%c" : "%03d°%04.1f'%c", d,
+  return wxString::Format(lat ? L"%02d\u00b0%04.1f'%c" : L"%03d\u00b0%04.1f'%c", d,
                           (v - d) * 60.0, h);
 }
 

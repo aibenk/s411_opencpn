@@ -154,6 +154,38 @@ int main(int argc, char **argv) {
           "zip dataset has features");
   }
 
+  // --- 6a: WMO egg code for the pick report ------------------------------
+  {
+    S411Dataset bsh, v1;
+    LoadS411File(fx + "/411DE00EK1250220.GML", bsh, err);
+    size_t eggs = 0;
+    bool consistent = true;
+    for (const auto &f : bsh.features) {
+      if (f.egg.Empty()) continue;
+      eggs++;
+      if (f.egg.ct != f.totalConcentration || f.egg.cols.size() > 3)
+        consistent = false;
+      // the first stage of the first column is the area's stage of development
+      if (!f.egg.cols.empty() && !f.egg.cols[0].sf.empty() &&
+          f.egg.cols[0].sf[0].first != f.stageOfDevelopment)
+        consistent = false;
+    }
+    Check(eggs >= 100, "egg: real BSH chart areas carry egg-code data");
+    Check(consistent, "egg: Ct and Sa agree with the parsed attributes");
+    LoadS411File(fx + "/v1_latlon.gml", v1, err);
+    const S411Egg &e = v1.features[0].egg;
+    Check(e.ct == "60" && e.cols.size() == 1 && e.cols[0].sf.size() == 1 &&
+              e.cols[0].sf[0].first == "91" && e.cols[0].sf[0].second == "07",
+          "egg: Edition 1.x lists iceact/icesod/iceflz -> Ct, Sa, Fa");
+    S411Dataset sg;
+    S411LoadSigridFile(fx + "/sigrid3_geo_20261020.shp", sg, err);
+    Check(!sg.features.empty() && sg.features[0].egg.ct == "92" &&
+              sg.features[0].egg.cols.size() == 1 &&
+              sg.features[0].egg.cols[0].sf[0].first == "93" &&
+              sg.features[0].egg.cols[0].sf[0].second == "04",
+          "egg: SIGRID-3 CT/SA/FA -> Ct, Sa, Fa");
+  }
+
   // --- 6b: nested zips and gzip -------------------------------------------
   {
     std::vector<S411Dataset> sets;
