@@ -12,8 +12,12 @@
  ***************************************************************************/
 #pragma once
 
+#include <wx/thread.h>
 #include <wx/wx.h>
 
+#include <atomic>
+#include <functional>
+#include <map>
 #include <vector>
 
 #include "ocpn_plugin.h"
@@ -22,6 +26,9 @@
 #include "S411Router.h"
 
 class S411CtrlDialog;
+class S411LoadTimer;
+class S411Worker;
+struct S411Painter;
 
 class s411_pi : public opencpn_plugin_116 {
 public:
@@ -33,7 +40,7 @@ public:
   int GetAPIVersionMajor() override { return 1; }
   int GetAPIVersionMinor() override { return 16; }
   int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 7; }
+  int GetPlugInVersionMinor() override { return 8; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;
@@ -59,7 +66,23 @@ public:
   void SetPluginMessage(wxString &message_id, wxString &message_body) override;
 
   // called back by the control dialog
+  /** File dialog, then load the chosen files on a worker thread. */
   void LoadFiles();
+  /** Load files on a worker thread (no dialog); results arrive in PollLoad. */
+  void LoadPaths(const wxArrayString &paths);
+  bool IsLoading() const { return m_loading; }
+  void CancelLoad() { m_cancel = true; }
+  wxString LoadProgress();
+  /** Called by a timer while loading: merges finished results. */
+  void PollLoad();
+  /** Download the newest chart of every ice service and load them (4.2). */
+  void DownloadCurrentCharts();
+  /** Re-apply dataset precedence after loading/visibility changes. */
+  void DataChanged();
+  /** One line per dataset for the list: producer, time, age, flags. */
+  wxString DatasetLabel(const S411Dataset &ds) const;
+  /** Warnings for the panel: overlapping producers, outdated data. */
+  wxString Warnings() const;
   void ClearData();
   void SetShow(bool on);
   void Refresh();
@@ -88,6 +111,11 @@ public:
   wxString ExportHazards();
   /** Delete every boundary this plugin created. */
   void ClearHazards();
+  /** Check OpenCPN's active (else selected, else last ice) route against
+   *  the ice alerts of PS clause 9.6; marks the hits on the chart and
+   *  returns a report. */
+  wxString CheckActiveRoute();
+  void ClearRouteAlerts() { m_routeAlerts.clear(); }
   bool OcpnDrawAvailable() const { return m_odAvailable; }
   S411RouteParams &RouteParams() { return m_route; }
 
@@ -101,12 +129,23 @@ public:
   wxString m_iceClass;                 // "", IC, IB, IA, IASuper
   S411Palette m_palette = S411Palette::Day;
   int m_alpha = 170;                   // area fill opacity, 26..255
+  double m_ageLimitH = 72;             // PS 8.1 mariner age limit (hours)
+  bool m_showValues = true;            // PS 9.7 value texts (cm, kn)
+  bool m_showAgeBox = true;            // data age box on the chart
 
 private:
   void MakeIcon();
   void ShowControl();
   bool RenderDC(wxDC &dc, PlugIn_ViewPort *vp);
   bool RenderGL(PlugIn_ViewPort *vp);
+  // shared by both back ends: symbols, value text, iceberg pattern, data
+  // age box and route alert markers
+  void RenderOverlays(S411Painter &p, PlugIn_ViewPort *vp);
+  /** Indices of the visible datasets, oldest analysis first (the most
+   *  recent analysis is drawn on top, PS clause 4.6). */
+  std::vector<size_t> DrawOrder() const;
+  void FinishLoad();
+  void JoinLoader();
   void LoadConfig();
   void SaveConfig();
   void ShowPickReport(const std::vector<S411Hit> &hits, double lat,
@@ -137,4 +176,15 @@ private:
   bool m_odAvailable = false;
   wxString m_odReply;                  // reply captured during SendOcpnDraw
   bool m_capturingReply = false;
+  std::vector<S411RouteAlert> m_routeAlerts;  // markers of the last check
+
+  // background loading. wxThread/wxMutex, NOT std::thread/std::mutex: the
+  // plugin runs on OpenCPN's bundled msvcp140.dll (14.12, VS 2017), in which
+  // a std::mutex compiled with VS 2022 crashes (constexpr mutex change)
+  S411Worker *m_loader = nullptr;      // joinable; deleted after Wait()
+  std::atomic<bool> m_loading{false}, m_loadDone{false}, m_cancel{false};
+  wxMutex m_loadMx;                    // guards the three fields below
+  std::vector<S411Dataset> m_loadOut;
+  wxString m_loadErrors, m_loadMsg;
+  S411LoadTimer *m_loadTimer = nullptr;
 };

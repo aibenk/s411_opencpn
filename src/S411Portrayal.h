@@ -209,3 +209,78 @@ inline bool S411LineStyleFor(const wxString &type, S411LineStyle &out) {
   else { out = {1.5, S411Dash::Solid, 0, "ICELIN"}; return false; }
   return true;
 }
+
+// point feature -> Annex C symbol (S-411 Rules: PointSymbol table, icebergs
+// by icebergSize, drift arrows by driftDirection octant code). Empty for a
+// type without a point symbol.
+inline wxString S411PointSymbolFor(const wxString &type,
+                                   const wxString &icebergSize,
+                                   const wxString &driftDirection) {
+  if (type == "Iceberg") {
+    static const char *sz[] = {"01", "02", "03", "04", "05",
+                               "06", "07", "08", "09", "99"};
+    for (const char *c : sz)
+      if (icebergSize == c) return wxString("ICEBRG") + c;
+    return "ICEBRG99";
+  }
+  if (type == "IceDrift") {
+    static const char *dc[] = {"01", "02", "03", "04", "05", "06",
+                               "07", "08", "97", "98", "99"};
+    for (const char *c : dc)
+      if (driftDirection == c) return wxString("ICEDFT") + c;
+    return "ICEDFT99";
+  }
+  struct P { const char *type, *sym; };
+  static const P T[] = {
+      {"Floeberg", "FLOBRG01"},        {"GroundedHummock", "IGRHM01"},
+      {"IceCompacting", "ICECOM01"},   {"IceDivergence", "ICEDIV01"},
+      {"IceFracture", "ICEFRA01"},     {"IceKeelBummock", "ICEKEL01"},
+      {"IceLead", "ICELEA01"},         {"IceRafting", "ICERFT01"},
+      {"IceReportStation", "REPSTA01"},{"IceRidgeHummock", "ICERDG01"},
+      {"IceShear", "ICESHR01"},        {"IceThickness", "ICETHK01"},
+      {"SnowCover", "SNWCVR01"},       {"StageOfMelt", "STGMLT01"},
+      {"StripsAndPatches", "STRPTC01"},
+  };
+  for (const auto &p : T)
+    if (type == p.type) return p.sym;
+  return "";
+}
+
+// PS clause 9.7: attribute drawn as text next to the symbol, and its unit
+inline bool S411ValueTextSpec(const wxString &type, const char *&attr,
+                              const char *&unit) {
+  if (type == "IceThickness") { attr = "meanIceThickness"; unit = "cm"; return true; }
+  if (type == "IceDrift") { attr = "driftSpeed"; unit = "kn"; return true; }
+  return false;
+}
+
+// PS clause 9.6 alerts (independent of the colour scheme)
+enum class S411Alert { None, IceDifficult, IceHazard, Icebergs };
+
+inline S411Alert S411AreaAlert(const wxString &ct, bool fastIce,
+                               const wxString &iceClass) {
+  const wxString nav = S411NavToken(ct.IsEmpty() ? wxString("99") : ct,
+                                    iceClass);
+  if (fastIce || nav == "ICEC9T") return S411Alert::IceHazard;
+  if (nav == "ICEC46" || nav == "ICEUNK") return S411Alert::IceDifficult;
+  return S411Alert::None;
+}
+
+inline S411Alert S411FeatureAlert(const wxString &type, const wxString &ct,
+                                  bool fastIce, const wxString &iceClass) {
+  if (type == "Iceberg" || type == "Floeberg" || type == "IcebergArea" ||
+      type == "IcebergLimit")
+    return S411Alert::Icebergs;
+  if (type == "SeaIce" || type == "LakeIce" || type == "StripsAndPatches")
+    return S411AreaAlert(ct, fastIce, iceClass);
+  return S411Alert::None;
+}
+
+inline const char *S411AlertName(S411Alert a) {
+  switch (a) {
+    case S411Alert::IceHazard: return "IceHazardForVessel";
+    case S411Alert::IceDifficult: return "IceDifficultForVessel";
+    case S411Alert::Icebergs: return "Icebergs";
+    default: return "";
+  }
+}

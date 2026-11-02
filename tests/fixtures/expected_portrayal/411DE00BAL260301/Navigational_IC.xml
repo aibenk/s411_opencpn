@@ -1,0 +1,195 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<p:displayList xmlns:p="http://www.iho.int/S100Presentation/5.2">
+  <nullInstruction>
+    <featureReference>DC_1</featureReference>
+    <viewingGroup>41990</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>0</drawingPriority>
+  </nullInstruction>
+  <areaInstruction>
+    <featureReference>SI_1</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_2</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_3</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_4</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_5</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>LI_1</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>2</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <lineInstruction>
+    <featureReference>IE_1</featureReference>
+    <viewingGroup>41130</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>5</drawingPriority>
+    <lineStyleReference reference="ICEEDG01"/>
+  </lineInstruction>
+  <lineInstruction>
+    <featureReference>OWL_1</featureReference>
+    <viewingGroup>41130</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>7</drawingPriority>
+    <lineStyleReference reference="ICEOWL01"/>
+  </lineInstruction>
+  <lineInstruction>
+    <featureReference>IRL_1</featureReference>
+    <viewingGroup>41140</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>9</drawingPriority>
+    <lineStyleReference reference="ICERDL01"/>
+  </lineInstruction>
+  <lineInstruction>
+    <featureReference>JB_1</featureReference>
+    <viewingGroup>41140</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>13</drawingPriority>
+    <lineStyleReference reference="ICEJBB01"/>
+  </lineInstruction>
+  <pointInstruction>
+    <featureReference>IT_1</featureReference>
+    <viewingGroup>41180</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>18</drawingPriority>
+    <symbol reference="ICETHK01"/>
+  </pointInstruction>
+  <textInstruction>
+    <featureReference>IT_1</featureReference>
+    <viewingGroup>41191</viewingGroup>
+    <viewingGroup>41180</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>18</drawingPriority>
+    <textPoint horizontalAlignment="Start" verticalAlignment="Center">
+      <element>
+        <text>70 cm</text>
+        <bodySize>10</bodySize>
+        <foreground>ICELIN</foreground>
+        <fontCharacteristics>
+          <serifs>false</serifs>
+          <proportion>Proportional</proportion>
+          <weight>Medium</weight>
+          <slant>Upright</slant>
+        </fontCharacteristics>
+      </element>
+      <offset>
+        <x>4</x>
+        <y>0</y>
+      </offset>
+    </textPoint>
+  </textInstruction>
+  <pointInstruction>
+    <featureReference>IT_2</featureReference>
+    <viewingGroup>41180</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>18</drawingPriority>
+    <symbol reference="ICETHK01"/>
+  </pointInstruction>
+  <textInstruction>
+    <featureReference>IT_2</featureReference>
+    <viewingGroup>41191</viewingGroup>
+    <viewingGroup>41180</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>18</drawingPriority>
+    <textPoint horizontalAlignment="Start" verticalAlignment="Center">
+      <element>
+        <text>35 cm</text>
+        <bodySize>10</bodySize>
+        <foreground>ICELIN</foreground>
+        <fontCharacteristics>
+          <serifs>false</serifs>
+          <proportion>Proportional</proportion>
+          <weight>Medium</weight>
+          <slant>Upright</slant>
+        </fontCharacteristics>
+      </element>
+      <offset>
+        <x>4</x>
+        <y>0</y>
+      </offset>
+    </textPoint>
+  </textInstruction>
+  <pointInstruction>
+    <featureReference>ID_1</featureReference>
+    <viewingGroup>41160</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>23</drawingPriority>
+    <symbol reference="ICEDFT05"/>
+  </pointInstruction>
+  <textInstruction>
+    <featureReference>ID_1</featureReference>
+    <viewingGroup>41191</viewingGroup>
+    <viewingGroup>41160</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>23</drawingPriority>
+    <textPoint horizontalAlignment="Start" verticalAlignment="Center">
+      <element>
+        <text>0.4 kn</text>
+        <bodySize>10</bodySize>
+        <foreground>ICELIN</foreground>
+        <fontCharacteristics>
+          <serifs>false</serifs>
+          <proportion>Proportional</proportion>
+          <weight>Medium</weight>
+          <slant>Upright</slant>
+        </fontCharacteristics>
+      </element>
+      <offset>
+        <x>4</x>
+        <y>0</y>
+      </offset>
+    </textPoint>
+  </textInstruction>
+  <pointInstruction>
+    <featureReference>IC_1</featureReference>
+    <viewingGroup>41160</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>14</drawingPriority>
+    <symbol reference="ICECOM01"/>
+  </pointInstruction>
+</p:displayList>

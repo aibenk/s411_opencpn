@@ -200,7 +200,7 @@ static bool ComputeRouteOnce(const std::vector<S411Dataset> &data,
   for (const auto &ds : data) {
     if (!ds.visible) continue;
     for (const auto &f : ds.features)
-      FillFeature(g, f, S411RouteSeverity(f, p.iceClass));
+      if (!f.superseded) FillFeature(g, f, S411RouteSeverity(f, p.iceClass));
   }
 
   const int si = g.Col(start.lon), sj = g.Row(start.lat);
@@ -476,7 +476,8 @@ size_t S411ExtractHazards(const std::vector<S411Dataset> &data,
   for (const auto &ds : data) {
     if (!ds.visible) continue;
     for (const auto &f : ds.features) {
-      if (f.kind != S411Kind::Area || f.rings.empty()) continue;
+      if (f.kind != S411Kind::Area || f.rings.empty() || f.superseded)
+        continue;
       const S411CellState sev = S411RouteSeverity(f, iceClass);
       if (sev != S411CellState::Blocked &&
           !(includeCaution && sev == S411CellState::Caution))
@@ -490,6 +491,127 @@ size_t S411ExtractHazards(const std::vector<S411Dataset> &data,
       for (auto &pnt : z.ring) pnt.lon = NormLon(pnt.lon);
       if (z.ring.size() >= 3) out.push_back(z);
     }
+  }
+  return out.size();
+}
+
+// ---------------------------------------------------------------------------
+// route ice check (PS clause 9.6 alerts along an existing route)
+// ---------------------------------------------------------------------------
+// parameter t in [0,1] along a-b where it crosses c-d, or -1
+static double SegCross(const S411Pos &a, const S411Pos &b, const S411Pos &c,
+                       const S411Pos &d) {
+  const double rx = b.lon - a.lon, ry = b.lat - a.lat;
+  const double sx = d.lon - c.lon, sy = d.lat - c.lat;
+  const double den = rx * sy - ry * sx;
+  if (std::fabs(den) < 1e-15) return -1;
+  const double t = ((c.lon - a.lon) * sy - (c.lat - a.lat) * sx) / den;
+  const double u = ((c.lon - a.lon) * ry - (c.lat - a.lat) * rx) / den;
+  return (t >= 0 && t <= 1 && u >= 0 && u <= 1) ? t : -1;
+}
+
+static bool InsideRings(const std::vector<std::vector<S411Pos>> &rings,
+                        const S411Pos &p) {
+  bool in = false;
+  for (const auto &ring : rings)
+    for (size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
+      const S411Pos &a = ring[i], &b = ring[j];
+      if ((a.lat > p.lat) != (b.lat > p.lat) &&
+          p.lon < (b.lon - a.lon) * (p.lat - a.lat) / (b.lat - a.lat) + a.lon)
+        in = !in;
+    }
+  return in;
+}
+
+size_t S411CheckRoute(const std::vector<S411Dataset> &data,
+                      const std::vector<S411Pos> &wps,
+                      const wxString &iceClass, double bergTolNm,
+                      std::vector<S411RouteAlert> &out) {
+  out.clear();
+  for (size_t leg = 0; leg + 1 < wps.size(); leg++) {
+    S411Pos a = wps[leg], b = wps[leg + 1];
+    b.lon = a.lon + NormLon(b.lon - a.lon);  // the short way round
+    // earliest entry per alert kind on this leg
+    struct Best { double t = 2; S411RouteAlert r; };
+    Best best[4];
+    auto note = [&](S411Alert al, double t, const S411Feature &f,
+                    const S411Dataset &ds) {
+      Best &bb = best[(int)al];
+      if (t >= bb.t) return;
+      bb.t = t;
+      bb.r.leg = leg;
+      bb.r.alert = al;
+      bb.r.where = {a.lat + t * (b.lat - a.lat),
+                    NormLon(a.lon + t * (b.lon - a.lon))};
+      wxString what = f.type;
+      if (f.fastIce) what += " (fast ice)";
+      else if (!f.totalConcentration.IsEmpty()) {
+        const wxString l = S411ConcLabel(f.totalConcentration);
+        what += " " + (l.IsEmpty() ? f.totalConcentration : l);
+      }
+      bb.r.feature = what;
+      bb.r.dataset = ds.title;
+    };
+    for (const auto &ds : data) {
+      if (!ds.visible) continue;
+      for (const auto &f : ds.features) {
+        if (f.superseded || f.rings.empty() || f.rings[0].empty()) continue;
+        const S411Alert al =
+            f.kind == S411Kind::Area
+                ? (f.type == "IcebergArea"
+                       ? S411Alert::Icebergs
+                       : S411AreaAlert(f.totalConcentration, f.fastIce,
+                                       iceClass))
+                : S411FeatureAlert(f.type, f.totalConcentration, f.fastIce,
+                                   iceClass);
+        if (al == S411Alert::None) continue;
+        if (f.kind == S411Kind::Area && f.type != "SeaIce" &&
+            f.type != "LakeIce" && f.type != "StripsAndPatches" &&
+            f.type != "IcebergArea")
+          continue;
+        // the leg on the feature's world copy
+        const double k = Shift((f.lonMin + f.lonMax) / 2.0,
+                               (a.lon + b.lon) / 2.0);
+        const S411Pos pa = {a.lat, a.lon + k}, pb = {b.lat, b.lon + k};
+        const double tolDeg = f.kind == S411Kind::Point
+                                  ? bergTolNm / NM_PER_KM / KM_PER_DEG
+                                  : 0.0;
+        if (std::max(pa.lat, pb.lat) < f.latMin - tolDeg ||
+            std::min(pa.lat, pb.lat) > f.latMax + tolDeg ||
+            std::max(pa.lon, pb.lon) <
+                f.lonMin - tolDeg / CosLat(f.latMin) ||
+            std::min(pa.lon, pb.lon) > f.lonMax + tolDeg / CosLat(f.latMin))
+          continue;
+        if (f.kind == S411Kind::Area) {
+          double t = InsideRings(f.rings, pa) ? 0.0 : 2.0;
+          for (const auto &ring : f.rings)
+            for (size_t i = 0; t > 0 && i < ring.size(); i++) {
+              const double c =
+                  SegCross(pa, pb, ring[i], ring[(i + 1) % ring.size()]);
+              if (c >= 0 && c < t) t = c;
+            }
+          if (t <= 1) note(al, t, f, ds);
+        } else if (f.kind == S411Kind::Line) {
+          const auto &ln = f.rings[0];
+          for (size_t i = 0; i + 1 < ln.size(); i++) {
+            const double c = SegCross(pa, pb, ln[i], ln[i + 1]);
+            if (c >= 0) note(al, c, f, ds);
+          }
+        } else {
+          const S411Pos &p = f.rings[0][0];
+          const double d = PointSegDist(p, pa, pb) * KM_PER_DEG;  // km
+          if (d * NM_PER_KM <= bergTolNm) {
+            const double len = DistKm(pa, pb);
+            const double t =
+                len > 0 ? std::min(1.0, DistKm(pa, p) / len) : 0.0;
+            note(al, t, f, ds);
+          }
+        }
+      }
+    }
+    for (S411Alert al : {S411Alert::IceHazard, S411Alert::IceDifficult,
+                         S411Alert::Icebergs})
+      if (best[(int)al].t <= 1) out.push_back(best[(int)al].r);
   }
   return out.size();
 }

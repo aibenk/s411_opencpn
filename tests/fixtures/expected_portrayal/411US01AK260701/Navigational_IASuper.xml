@@ -1,0 +1,1386 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<p:displayList xmlns:p="http://www.iho.int/S100Presentation/5.2">
+  <nullInstruction>
+    <featureReference>DC_1</featureReference>
+    <viewingGroup>41990</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>0</drawingPriority>
+  </nullInstruction>
+  <areaInstruction>
+    <featureReference>SI_1</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_2</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_3</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_4</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_5</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_6</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_7</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_8</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_9</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_10</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_11</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_12</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_13</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_14</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_15</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_16</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_17</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_18</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_19</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_20</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_21</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_22</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_23</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_24</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_25</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_26</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_27</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_28</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_29</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_30</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_31</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_32</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_33</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_34</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_35</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_36</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_37</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_38</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_39</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_40</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_41</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_42</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_43</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_44</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_45</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_46</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_47</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_48</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_49</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_50</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_51</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_52</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_53</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_54</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_55</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_56</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_57</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_58</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_59</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_60</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_61</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_62</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_63</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_64</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_65</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_66</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_67</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_68</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_69</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_70</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_71</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_72</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_73</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFRE</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_74</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_75</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_76</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_77</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_78</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_79</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_80</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_81</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_82</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_83</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_84</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_85</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_86</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_87</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_88</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_89</featureReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC13</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_90</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_91</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_92</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_93</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_94</featureReference>
+    <alertReference>IceDifficultForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC46</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_95</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_96</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_97</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_98</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_99</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_100</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_101</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_102</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_103</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_104</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_105</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_106</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_107</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_108</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_109</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_110</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_111</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_112</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_113</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_114</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_115</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_116</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_117</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_118</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_119</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_120</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_121</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_122</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_123</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_124</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_125</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_126</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_127</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_128</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_129</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_130</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_131</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_132</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_133</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_134</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEFST</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_135</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_136</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_137</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_138</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_139</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_140</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_141</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_142</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+  <areaInstruction>
+    <featureReference>SI_143</featureReference>
+    <alertReference>IceHazardForVessel</alertReference>
+    <viewingGroup>41110</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>1</drawingPriority>
+    <colorFill>
+      <color transparency="0.25">ICEC9T</color>
+    </colorFill>
+  </areaInstruction>
+</p:displayList>

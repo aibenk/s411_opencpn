@@ -1,0 +1,58 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<p:displayList xmlns:p="http://www.iho.int/S100Presentation/5.2">
+  <nullInstruction>
+    <featureReference>DC_1</featureReference>
+    <viewingGroup>41990</viewingGroup>
+    <displayPlane>UnderRADAR</displayPlane>
+    <drawingPriority>0</drawingPriority>
+  </nullInstruction>
+  <pointInstruction>
+    <featureReference>ST_1</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_2</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_3</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_4</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_5</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_6</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+  <pointInstruction>
+    <featureReference>ST_7</featureReference>
+    <viewingGroup>41190</viewingGroup>
+    <displayPlane>OverRADAR</displayPlane>
+    <drawingPriority>29</drawingPriority>
+    <symbol reference="REPSTA01"/>
+  </pointInstruction>
+</p:displayList>

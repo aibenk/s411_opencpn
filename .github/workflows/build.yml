@@ -10,14 +10,25 @@ jobs:
       - name: dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libwxgtk3.2-dev libglu1-mesa-dev
+          sudo apt-get install -y cmake g++ libwxgtk3.2-dev libglu1-mesa-dev libssl-dev
       - name: configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DS411_BUILD_TESTS=ON
       - name: build
         run: cmake --build build --parallel
-      - name: run parser tests against real S-411 datasets
+      - name: run tests against real S-411 datasets and the golden display lists
         run: ./build/s411_test tests/fixtures
       - uses: actions/upload-artifact@v4
         with:
           name: libs411_pi-linux
           path: build/libs411_pi.so
+
+  # the same headless tests with MSVC / wx 3.2.9 vc14x (the toolchain of the
+  # OpenCPN Windows build); the plugin DLL itself needs an installed OpenCPN
+  # to generate its import library and is built locally with buildwin.ps1
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: build and run tests (MSVC, Win32)
+        shell: pwsh
+        run: ./buildwin.ps1 -TestOnly

@@ -1,5 +1,46 @@
 # s411_pi — test report and improvement backlog
 
+## 0 Implementation status (v0.8.0, 2026-11-02)
+
+Every item of the v0.7.0 backlog below is implemented except the two
+publishing steps of 4.1, which need the repository owner. Headless tests:
+152 checks, green on Windows (MSVC, CNG) and Linux (g++, OpenSSL).
+
+| Item | Status | What was done |
+|---|---|---|
+| 2.1 NIC load time | **done** | Cause: the GLU sweep keeps active edges in a linked list; one NIC polygon with 1 652 holes took 60 s. Large polygons are now tessellated in tiles (recursive bisection, `S411Tess.cpp`): NIC Arctic 63 s → 1.4 s. A second cause showed on the 52 MB SHN chart: wx's XML parser is quadratic on multi-megabyte text nodes, so coordinate text is lifted out before parsing and read with a fast locale-independent scanner (157 s → 18 s). Loading runs on a worker thread with a progress bar and *Cancel*. Tests: load-time budget on the NIC chart (fixture) and on a synthetic 1 600-hole polygon. |
+| 2.2 South Pole areas | **done** | Pole-enclosing rings (winding sum ±360°) are closed along ±90° before tessellating; holes are placed on the exterior's world copy by its centre; 360°-wide areas are drawn in two world copies where the view straddles the seam; the synthetic pole edges are never outlined. Tests: circumpolar fixture (area, picks at 180° and at the pole, hole). All 23 current charts of the Ice Portal load with every non-degenerate area tessellated. |
+| 2.3 Installed build | **done** | The v0.8.0 DLL is hot-swapped into `%LOCALAPPDATA%\opencpn\plugins` (the July DLL is backed up). README and TESTING document the update route (close OpenCPN → `hotswap.ps1`, or uninstall → restart → import). |
+| 2.4 Documentation | **done** | README status v0.8.0 with all features; `metadata.xml` version 0.8.0 and a versioned `tarball-url` (works once the release exists, see 4.1). |
+| 3.1 Point symbols | **done** | All 37 Annex C symbols, converted by `tools/gen_symbols.py` into vector primitives (`src/S411Symbols.h`) — no SVG renderer or extra install files; palette colours; icebergs by `icebergSize`, drift arrows by `driftDirection` and rotated with the chart. |
+| 3.2 Text and iceberg area | **done** | Thickness (cm) and drift speed (kn) next to the symbol, switchable; iceberg areas filled with the `ICEBRGA1` symbol lattice instead of hatching. |
+| 3.3 Route alerts | **done** | *Check active route* (active, else selected, else last ice route): per leg the first entry into `IceHazardForVessel` / `IceDifficultForVessel` / `Icebergs` areas, crossed iceberg limits and bergs within 1 NM; exact segment/polygon intersection; report dialog and markers on the chart. |
+| 3.4 Age and validity | **done** | Analysis/forecast time from the data, valid-until from the catalogue; age box on the chart, age in list and pick report, mariner age limit (default 72 h), *outdated* and *> 30 days* datasets load hidden with an explanation. Edition 1.x: date from `catalogue.xml` or the file name, marked approximate. |
+| 3.5 Overlapping datasets | **done**, one simplification | Same producer: features of an older analysis inside the newer `DataCoverage` are hidden (feature-level — a feature straddling the coverage edge stays; no polygon clipping); forecasts hidden by default; different producers never merged, overlap indicated in panel and chart box; newest analysis drawn on top. |
+| 3.6 Signatures | **done** | ECDSA-384-SHA2 over the dataset bytes and the certificate chain to the catalogue's scheme administrator, plus `CATALOG.SIGN`; Windows CNG, OpenSSL elsewhere, otherwise "not verified". Invalid data is not displayed (PS 11.3 rule 4); the TEST PKI is flagged "not for navigation". Trust in a specific SA certificate is not configured — the SA name is shown. |
+| 4.1 Distribution | **prepared** | CI builds and tests Linux and Windows; release procedure in the README. **Open (owner's decision):** create the GitHub release `v0.8.0` with the tarball, make the repo public, and register in the OpenCPN plugin catalogue. Further targets (flatpak, macOS, x64) not started. |
+| 4.2 Current charts | **done** | *Current charts…*: reads the Ice Portal index, offers the newest chart per service, downloads with `OCPN_downloadFile`, loads in the background. Portal URL configurable (`DownloadUrl` in the config). |
+| 4.3 Input formats | **done** | SIGRID-3 shapefiles (`.shp`/`.dbf`/`.prj`, loose or zipped; geographic or polar stereographic). GML in polar stereographic CRSs (EPSG 3031/3976/3413/3995) — the SHN charts on the portal use EPSG:3031 and failed to load before. |
+| 4.4 Rendering | **done** | OpenGL in Mercator: vertex arrays of precomputed Mercator coordinates and one matrix per feature, measured from OpenCPN's projection each frame and verified at two points; exact per-vertex path for other projections and above ~1:20 000. |
+| 4.5 Tests | **done** | Load-time budget, circumpolar ring, golden portrayal (colours, alerts, symbols, value texts; 4 datasets × 4 settings), signatures, precedence, age, route check, EPSG:3031, SIGRID-3; Windows job in CI (`buildwin.ps1 -TestOnly`). |
+
+**Fixed after the first field test (crash on loading any file):** OpenCPN for
+Windows ships `msvcp140.dll` 14.12 (VS 2017), and plugins run on it. The
+background loader used `std::mutex` compiled with VS 2022, whose constexpr
+mutex crashes in that old runtime (access violation in `msvcp140.dll`, three
+CrashRpt dumps in `C:\ProgramData\opencpn\CrashReports`). The loader now uses
+`wxThread`/`wxMutex` from OpenCPN's own wx DLLs, MSVC builds define
+`_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR`, and every remaining `msvcp140` import
+of the DLL was checked against the 14.12 export table. Rule for future work:
+no `std::thread`/`std::mutex`/`std::condition_variable` in the plugin.
+
+Still to do by a person at the screen: the interactive checklist
+`docs/TESTING.md` section 3 (items 30–49 are new in v0.8.0).
+
+---
+
+# v0.7.0 test report (history)
+
 Status of **v0.7.0** (commit `50c5317`), tested on 2026-11-02 on Windows 11 with
 OpenCPN 5.14.0 (wxWidgets 3.2.9, Win32 build, Visual Studio 2022).
 

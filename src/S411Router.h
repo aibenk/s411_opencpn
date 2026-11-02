@@ -77,3 +77,23 @@ size_t S411ExtractHazards(const std::vector<S411Dataset> &data,
  *  tests). Keeps first/last point of the input open ring. */
 void S411SimplifyRing(const std::vector<S411Pos> &in, size_t maxPoints,
                       std::vector<S411Pos> &out);
+
+/** One ice alert along a route leg (PS clause 9.6, route planning). */
+struct S411RouteAlert {
+  size_t leg;          // 0-based: leg i runs from waypoint i to i+1
+  S411Alert alert;     // IceHazard / IceDifficult / Icebergs
+  S411Pos where;       // first position on the leg where it applies
+  wxString feature;    // feature type and decoded concentration
+  wxString dataset;    // dataset title
+};
+
+/** Check a route (waypoints in order) against the visible, displayable ice:
+ *  for every leg, the first entry into red ice / fast ice
+ *  (IceHazardForVessel), amber or unknown ice (IceDifficultForVessel) and
+ *  icebergs - iceberg areas, crossed iceberg limits, and Iceberg/Floeberg
+ *  points within bergTolNm of the leg (Icebergs). Exact segment/polygon
+ *  intersection, not sampling. Results are ordered by leg, worst first. */
+size_t S411CheckRoute(const std::vector<S411Dataset> &data,
+                      const std::vector<S411Pos> &waypoints,
+                      const wxString &iceClass, double bergTolNm,
+                      std::vector<S411RouteAlert> &out);

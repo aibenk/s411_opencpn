@@ -6,20 +6,32 @@
  *   fixtures/411DE00EK1250220.GML         real BSH chart (337 features)
  *   fixtures/411US01AK260701.GML          real NWS Alaska chart (crosses 180)
  *   fixtures/411DE00EIS250217.GML         ice report + point stations
+ *   fixtures/S411_NATICE_ArcticExtent_*.zip  real NIC Arctic chart (1.x zip,
+ *                                         pole-enclosing, 1652 holes)
+ *   fixtures/circumpolar.gml, prec_*.gml, forecast.gml   synthetic
+ *   fixtures/expected_portrayal/          Annex G golden display lists
  *
  * Copyright (C) 2026 by the s411_pi authors
  * License: GNU General Public License v2 or later (see LICENSE)
  ***************************************************************************/
+#include <wx/ffile.h>
+#include <wx/filefn.h>
+#include <wx/filename.h>
 #include <wx/init.h>
+#include <wx/stopwatch.h>
 #include <wx/string.h>
+#include <wx/xml/xml.h>
 
 #include <cmath>
 #include <cstdio>
+#include <map>
 
 #include "S411Boundary.h"
 #include "S411Data.h"
 #include "S411Portrayal.h"
 #include "S411Router.h"
+#include "S411Symbols.h"
+#include "S411Tess.h"
 
 static int g_fail = 0;
 
@@ -140,6 +152,24 @@ int main(int argc, char **argv) {
     Check(n >= 1, "zip archive loads >= 1 dataset");
     Check(n >= 1 && !sets.empty() && sets[0].features.size() >= 10,
           "zip dataset has features");
+  }
+
+  // --- 6b: nested zips and gzip -------------------------------------------
+  {
+    std::vector<S411Dataset> sets;
+    errors.Clear();
+    size_t n = S411LoadPath(fx + "/nested.zip", sets, errors);
+    Check(n == 2, "zip in zip + .gml.gz entry: both datasets load");
+    bool signedInner = false;
+    for (const auto &d : sets)
+      signedInner |= d.producer == "DE00" && d.signature != S411SigState::None;
+    Check(signedInner, "nested exchange-set zip keeps its catalogue/signature");
+    sets.clear();
+    n = S411LoadPath(fx + "/circumpolar.gml.gz", sets, errors);
+    Check(n == 1 && sets[0].features.size() == 4, "gzipped GML loads");
+    sets.clear();
+    n = S411LoadPath(fx + "/TDS1.zip.gz", sets, errors);
+    Check(n == 1 && sets[0].producer == "DE00", "gzipped zip (.zip.gz) loads");
   }
 
   // --- 7: garbage handling -------------------------------------------------
@@ -600,6 +630,389 @@ int main(int argc, char **argv) {
       cf += 5;
     }
     Check(cpts == 3, "boundary: closed ring exports without the closing dup");
+  }
+
+  // --- 11: tessellation speed on huge polygons with many holes ------------
+  {
+    // one exterior and 1600 holes of 100 vertices: the shape that made the
+    // NIC Arctic chart take ~60 s in a single GLU pass (IMPROVEMENTS 2.1)
+    std::vector<std::vector<S411Pos>> rings(1);
+    for (int i = 0; i < 400; i++) rings[0].push_back({60.0, i * 0.25});
+    for (int i = 0; i < 400; i++) rings[0].push_back({60.0 + i * 0.05, 100.0});
+    for (int i = 0; i < 400; i++) rings[0].push_back({80.0, 100.0 - i * 0.25});
+    for (int i = 0; i < 400; i++) rings[0].push_back({80.0 - i * 0.05, 0.0});
+    double holeArea = 0;
+    for (int hx = 0; hx < 40; hx++)
+      for (int hy = 0; hy < 40; hy++) {
+        std::vector<S411Pos> h;
+        const double cx = 1.25 + hx * 2.45, cy = 60.25 + hy * 0.49, r = 0.15;
+        for (int k = 0; k < 100; k++) {
+          const double a = 2 * 3.14159265358979 * k / 100;
+          h.push_back({cy + r * std::sin(a), cx + r * std::cos(a)});
+        }
+        holeArea += RingArea(h);
+        rings.push_back(h);
+      }
+    std::vector<S411Pos> tris;
+    wxStopWatch sw;
+    S411Triangulate(rings, tris);
+    const long ms = sw.Time();
+    std::printf("      (1 exterior + 1600 holes, 161600 vertices: %ld ms)\n", ms);
+    Check(ms < 8000, "tess: 160k vertices / 1600 holes in < 8 s");
+    const double want = RingArea(rings[0]) - holeArea;
+    Check(std::fabs(TrisArea(tris) - want) / want < 0.005,
+          "tess: tiled triangulation area = exterior minus holes");
+  }
+
+  // --- 12: real NIC Arctic chart (1.x zip): load-time budget --------------
+  {
+    std::vector<S411Dataset> sets;
+    errors.Clear();
+    wxStopWatch sw;
+    size_t n = LoadS411Zip(fx + "/S411_NATICE_ArcticExtent_20260701.zip", sets,
+                           errors);
+    const long ms = sw.Time();
+    std::printf("      (NIC Arctic extent: %ld ms)\n", ms);
+    Check(n == 1, "NIC Arctic zip loads");
+    Check(ms < 20000, "NIC Arctic loads in < 20 s (was ~56 s)");
+    bool polar = false, areaOk = true;
+    if (n == 1)
+      for (const auto &f : sets[0].features) {
+        if (f.kind != S411Kind::Area || f.rings.size() < 100) continue;
+        polar = f.lonMax - f.lonMin >= 359.0;
+        double want = RingArea(f.rings[0]);
+        for (size_t i = 1; i < f.rings.size(); i++) want -= RingArea(f.rings[i]);
+        if (std::fabs(TrisArea(f.tris) - want) / want > 0.02) areaOk = false;
+      }
+    Check(polar, "NIC: the pole-enclosing ice area spans 360 deg");
+    Check(areaOk, "NIC: big area triangulated completely (area within 2%)");
+    if (n == 1) {
+      Check(sets[0].analysisTime == S411ParseIsoTime("2026-07-01") &&
+                sets[0].timeApprox,
+            "NIC 1.x: date from catalogue.xml, marked approximate");
+      Check(!sets[0].producer.IsEmpty(), "NIC 1.x: producer from catalogue");
+    }
+  }
+
+  // --- 13: circumpolar ring + point symbols + value text ------------------
+  {
+    S411Dataset ds;
+    bool ok = LoadS411File(fx + "/circumpolar.gml", ds, err);
+    Check(ok, "circumpolar fixture loads");
+    const S411Feature *sea = nullptr;
+    wxString bergSym, driftSym, driftTxt, thkTxt;
+    for (const auto &f : ds.features) {
+      if (f.type == "SeaIce") sea = &f;
+      if (f.type == "Iceberg") bergSym = f.symbol;
+      if (f.type == "IceDrift") { driftSym = f.symbol; driftTxt = f.valueText; }
+      if (f.type == "IceThickness") thkTxt = f.valueText;
+    }
+    Check(sea && !sea->tris.empty(), "circumpolar: ring is tessellated");
+    if (sea) {
+      const double want = RingArea(sea->rings[0]) - RingArea(sea->rings[1]);
+      Check(std::fabs(TrisArea(sea->tris) - want) / want < 0.01,
+            "circumpolar: area closed along the pole (minus the hole)");
+    }
+    std::vector<S411Dataset> v(1, ds);
+    std::vector<S411Hit> hits;
+    auto seaHit = [&](double lat, double lon) {
+      S411HitTest(v, lat, lon, 0.01, hits);
+      for (const auto &h : hits)
+        if (h.feature->type == "SeaIce") return true;
+      return false;
+    };
+    Check(seaHit(-75, 100) && seaHit(-75, -179.9) && seaHit(-89, 0),
+          "circumpolar: pick works everywhere inside, incl. 180 and the pole");
+    Check(!seaHit(-79, 20) && !seaHit(-65, 100),
+          "circumpolar: no pick in the hole or outside the ring");
+    Check(ds.coverage.size() == 1, "DataCoverage kept for precedence");
+    Check(bergSym == "ICEBRG03", "symbol: iceberg by icebergSize");
+    Check(driftSym == "ICEDFT02" && driftTxt == "0.5 kn",
+          "symbol: drift arrow by direction, speed text in kn");
+    Check(thkTxt == "35 cm", "text: mean ice thickness in cm");
+    Check(S411FindSymbol("ICEBRG03") && S411FindSymbol("REPSTA01") &&
+              S411FindSymbol("ICEDFT99"),
+          "symbols: Annex C vector symbols compiled in");
+  }
+
+  // --- 13b: polar stereographic input (SHN Argentina ships EPSG:3031) -----
+  {
+    S411Dataset ds;
+    bool ok = LoadS411File(fx + "/v1_epsg3031.gml", ds, err);
+    Check(ok && ds.features.size() == 1, "EPSG:3031 dataset loads");
+    if (ok && !ds.features.empty()) {
+      const S411Feature &f = ds.features[0];
+      Check(std::fabs(f.latMin + 65) < 1e-4 && std::fabs(f.latMax + 64) < 1e-4 &&
+                std::fabs(f.lonMin + 62) < 1e-4 && std::fabs(f.lonMax + 58) < 1e-4,
+            "EPSG:3031 metres -> lat/lon (pyproj reference, 1e-4 deg)");
+    }
+  }
+
+  // --- 13c: SIGRID-3 shapefiles (geographic, and polar stereographic zip) --
+  for (int k = 0; k < 2; k++) {
+    std::vector<S411Dataset> sets;
+    errors.Clear();
+    if (k == 0) {
+      S411Dataset ds;
+      if (S411LoadSigridFile(fx + "/sigrid3_geo_20261020.shp", ds, err))
+        sets.push_back(ds);
+    } else {
+      LoadS411Zip(fx + "/sigrid3_ant_20261020.zip", sets, errors);
+    }
+    const char *what = k == 0 ? "SIGRID-3 (lon/lat)" : "SIGRID-3 (EPSG:3031 zip)";
+    Check(sets.size() == 1 && sets[0].features.size() == 2,
+          wxString::Format("%s: ice + water polygons load, land is skipped",
+                           what).mb_str());
+    if (sets.size() == 1 && sets[0].features.size() == 2) {
+      const S411Feature &ice = sets[0].features[0];
+      const double want = RingArea(ice.rings[0]) - RingArea(ice.rings[1]);
+      Check(ice.totalConcentration == "92" && ice.stageOfDevelopment == "93" &&
+                sets[0].features[1].totalConcentration == "98",
+            wxString::Format("%s: CT/SA mapped (CT 00 -> 98 ice free)", what).mb_str());
+      Check(std::fabs(ice.latMin + 65) < 1e-3 && std::fabs(ice.lonMax + 58) < 1e-3 &&
+                std::fabs(TrisArea(ice.tris) - want) / want < 0.01,
+            wxString::Format("%s: position and hole correct", what).mb_str());
+      Check(S411FormatUtc(sets[0].analysisTime, true) == "20 Oct 2026",
+            wxString::Format("%s: date from the file name", what).mb_str());
+    }
+  }
+
+  // --- 14: metadata, validity and signatures (PS 8.1, 11.3) ---------------
+  {
+    std::vector<S411Dataset> sets;
+    errors.Clear();
+    LoadS411ExchangeSet(fx + "/TDS1/S100_ROOT/CATALOG.XML", sets, errors);
+    Check(sets.size() == 1, "signed TDS1 exchange set loads");
+    if (sets.size() == 1) {
+      const S411Dataset &d = sets[0];
+      Check(d.producer == "DE00", "metadata: producer code DE00");
+      Check(S411FormatUtc(d.analysisTime) == "1 Mar 2026 12:00",
+            "metadata: analysisDateTime parsed (UTC)");
+      Check(S411FormatUtc(d.validUntil) == "1 Mar 2026 23:59",
+            "metadata: valid until = catalogue timeInstantEnd");
+#if defined(_WIN32) || defined(S411_HAVE_OPENSSL)
+      Check(d.signature == S411SigState::Valid,
+            "signature: TDS1 verifies (ECDSA-384-SHA2, TEST PKI)");
+      Check(d.signatureNote.Contains("TEST PKI"),
+            "signature: TEST PKI is flagged as not for navigation");
+#else
+      Check(d.signature == S411SigState::Unverified,
+            "signature: reported unverified without a crypto library");
+#endif
+      std::printf("      (%s: %s)\n",
+                  (const char *)S411SigLabel(d.signature).utf8_str(),
+                  (const char *)d.signatureNote.utf8_str());
+    }
+    std::vector<S411Dataset> zs;
+    LoadS411Zip(fx + "/TDS1.zip", zs, errors);
+    Check(zs.size() == 1 && zs[0].signature == sets[0].signature &&
+              zs[0].producer == "DE00",
+          "signature: same result from the zipped exchange set");
+    S411Dataset single;
+    LoadS411File(fx + "/TDS1/S100_ROOT/S-411/DATASET_FILES/411DE00BAL260301.GML",
+                 single, err);
+    Check(single.signature == sets[0].signature,
+          "signature: a single GML finds its exchange catalogue");
+
+    // tampered copy: one byte of the dataset changed
+    wxString tmp = wxFileName::CreateTempFileName("s411");
+    wxRemoveFile(tmp);
+    const wxString root = tmp + "/S100_ROOT", dsDir = root + "/S-411/DATASET_FILES";
+    wxFileName::Mkdir(dsDir, wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+    wxCopyFile(fx + "/TDS1/S100_ROOT/CATALOG.XML", root + "/CATALOG.XML");
+    wxCopyFile(fx + "/TDS1/S100_ROOT/CATALOG.SIGN", root + "/CATALOG.SIGN");
+    {
+      wxFFile in(fx + "/TDS1/S100_ROOT/S-411/DATASET_FILES/411DE00BAL260301.GML", "rb");
+      wxString all;
+      in.ReadAll(&all, wxConvUTF8);
+      all.Replace("Bothnian Bay", "Bothnian Bax", false);
+      wxFFile out(dsDir + "/411DE00BAL260301.GML", "wb");
+      out.Write(all, wxConvUTF8);
+    }
+    std::vector<S411Dataset> bad;
+    LoadS411ExchangeSet(root + "/CATALOG.XML", bad, errors);
+#if defined(_WIN32) || defined(S411_HAVE_OPENSSL)
+    Check(bad.size() == 1 && bad[0].signature == S411SigState::Invalid &&
+              !bad[0].visible,
+          "signature: tampered dataset is INVALID and not displayed");
+#endif
+    wxFileName::Rmdir(tmp, wxPATH_RMDIR_RECURSIVE);
+
+    S411Dataset loose;
+    LoadS411File(fx + "/411DE00EK1250220.GML", loose, err);
+    Check(loose.signature == S411SigState::None && loose.producer == "DE00",
+          "metadata: loose GML is unsigned, producer from the dataset name");
+  }
+
+  // --- 15: precedence and forecasts (PS 4.6, Table 4-2) -------------------
+  {
+    std::vector<S411Dataset> v(3);
+    LoadS411File(fx + "/prec_old.gml", v[0], err);
+    LoadS411File(fx + "/prec_new.gml", v[1], err);
+    LoadS411File(fx + "/forecast.gml", v[2], err);
+    Check(!v[2].visible && v[2].forecastTime != 0,
+          "forecast: loaded but not displayed by default");
+    S411ApplyPrecedence(v);
+    Check(v[0].features.size() == 2 && v[0].features[0].superseded &&
+              !v[0].features[1].superseded,
+          "precedence: newer analysis supersedes the old one in its coverage");
+    Check(v[0].supersededBy.IsEmpty() && !v[1].features[0].superseded,
+          "precedence: remainder of the older chart stays displayable");
+    std::vector<S411Hit> hits;
+    S411HitTest(v, 61, 15, 0.01, hits);
+    Check(hits.size() == 1 && hits[0].ds == &v[1],
+          "precedence: pick reports the newer analysis only");
+    v[1].visible = false;
+    S411ApplyPrecedence(v);
+    Check(!v[0].features[0].superseded,
+          "precedence: hiding the newer chart brings the older one back");
+    v[1].visible = true;
+    v[1].producer = "YY00";
+    S411ApplyPrecedence(v);
+    Check(!v[0].features[0].superseded &&
+              S411OverlappingProducers(v) == "XX00, YY00",
+          "precedence: other producers never merge, overlap is indicated");
+  }
+
+  // --- 16: age of the ice information (PS 8.1) ----------------------------
+  {
+    S411Dataset d;
+    d.analysisTime = S411ParseIsoTime("2026-03-01T12:00:00Z");
+    const time_t h = 3600;
+    Check(S411DatasetAge(d, d.analysisTime + 10 * h, 72) == S411Age::Current,
+          "age: 10 h old is current");
+    Check(S411AgeText(d, d.analysisTime + 18 * h) ==
+              "Ice analysis 1 Mar 2026 12:00 UTC - 18 h old",
+          "age: text as in PS 8.1");
+    Check(S411DatasetAge(d, d.analysisTime + 100 * h, 72) == S411Age::OverLimit,
+          "age: older than the 72 h limit");
+    d.validUntil = d.analysisTime + 12 * h;
+    Check(S411DatasetAge(d, d.analysisTime + 13 * h, 72) == S411Age::Outdated,
+          "age: past valid-until is outdated");
+    Check(S411DatasetAge(d, d.analysisTime + 31 * 24 * h, 72) == S411Age::Expired,
+          "age: older than 30 days");
+    Check(S411ParseIsoTime("20260701") == S411ParseIsoTime("2026-07-01T00:00:00Z") &&
+              S411ParseIsoTime("garbage") == 0,
+          "age: ISO and compact dates parse, garbage does not");
+  }
+
+  // --- 17: route ice check (PS 9.6 alerts) --------------------------------
+  {
+    std::vector<S411Dataset> v(1);
+    S411Dataset &d = v[0];
+    auto area = [&](const char *type, const char *ct, double la0, double la1,
+                    double lo0, double lo1) {
+      S411Feature f;
+      f.type = type;
+      f.totalConcentration = ct;
+      f.rings.push_back({{la0, lo0}, {la0, lo1}, {la1, lo1}, {la1, lo0}});
+      f.latMin = la0; f.latMax = la1; f.lonMin = lo0; f.lonMax = lo1;
+      d.features.push_back(f);
+    };
+    area("SeaIce", "92", 60, 61, 20, 21);   // red for every class
+    area("SeaIce", "50", 60, 61, 22, 23);   // amber without ice class
+    S411Feature berg;
+    berg.type = "Iceberg";
+    berg.kind = S411Kind::Point;
+    berg.rings.push_back({{60.505, 25.0}});
+    berg.latMin = berg.latMax = 60.505;
+    berg.lonMin = berg.lonMax = 25.0;
+    d.features.push_back(berg);
+    std::vector<S411RouteAlert> al;
+    S411CheckRoute(v, {{60.5, 19.0}, {60.5, 26.0}}, "", 1.0, al);
+    bool hz = false, df = false, ib = false;
+    for (const auto &a : al) {
+      if (a.alert == S411Alert::IceHazard && std::fabs(a.where.lon - 20) < 1e-6) hz = true;
+      if (a.alert == S411Alert::IceDifficult && std::fabs(a.where.lon - 22) < 1e-6) df = true;
+      if (a.alert == S411Alert::Icebergs) ib = true;
+    }
+    Check(al.size() == 3 && hz && df && ib,
+          "route check: hazard, difficult and iceberg found at their entry");
+    S411CheckRoute(v, {{60.5, 19.0}, {60.5, 26.0}}, "IA", 1.0, al);
+    Check(al.size() == 2, "route check: amber 5/10 is fine for ice class IA");
+    S411CheckRoute(v, {{62.0, 19.0}, {62.0, 26.0}}, "", 1.0, al);
+    Check(al.empty(), "route check: clear route has no alerts");
+  }
+
+  // --- 18: golden portrayal (Annex G Expected_Portrayal display lists) ----
+  {
+    const char *ids[] = {"411DE00BAL260301", "411DE00EK1250220",
+                         "411DE00EIS250217", "411US01AK260701"};
+    const char *paths[] = {
+        "/TDS1/S100_ROOT/S-411/DATASET_FILES/411DE00BAL260301.GML",
+        "/411DE00EK1250220.GML", "/411DE00EIS250217.GML",
+        "/411US01AK260701.GML"};
+    struct Setting { const char *file; S411Mode mode; const char *cls; };
+    const Setting settings[] = {
+        {"Concentration_none", S411Mode::Concentration, ""},
+        {"StageOfDevelopment_none", S411Mode::StageOfDevelopment, ""},
+        {"Navigational_IC", S411Mode::Navigational, "IC"},
+        {"Navigational_IASuper", S411Mode::Navigational, "IASuper"}};
+    int okFill = 0, okAlert = 0, okSym = 0, okText = 0, total = 0;
+    for (int k = 0; k < 4; k++) {
+      S411Dataset ds;
+      LoadS411File(fx + paths[k], ds, err);
+      for (const auto &s : settings) {
+        total++;
+        std::map<wxString, int> wantFill, gotFill, wantAlert, gotAlert,
+            wantSym, gotSym, wantText, gotText;
+        wxXmlDocument doc;
+        if (!doc.Load(fx + "/expected_portrayal/" + ids[k] + "/" + s.file +
+                      ".xml"))
+          continue;
+        for (wxXmlNode *n = doc.GetRoot()->GetChildren(); n; n = n->GetNext()) {
+          if (n->GetType() != wxXML_ELEMENT_NODE) continue;
+          for (wxXmlNode *c = n->GetChildren(); c; c = c->GetNext()) {
+            if (c->GetName() == "alertReference")
+              wantAlert[c->GetNodeContent()]++;
+            if (c->GetName() == "colorFill")
+              for (wxXmlNode *col = c->GetChildren(); col; col = col->GetNext())
+                if (col->GetName() == "color") wantFill[col->GetNodeContent()]++;
+          }
+          if (n->GetName() == "pointInstruction")
+            for (wxXmlNode *c = n->GetChildren(); c; c = c->GetNext())
+              if (c->GetName() == "symbol") {
+                wantSym[c->GetAttribute("reference")]++;
+                break;  // first symbol = the feature's own
+              }
+          if (n->GetName() == "textInstruction") {
+            for (wxXmlNode *a = n->GetChildren(); a; a = a->GetNext())
+              if (a->GetName() == "textPoint")
+                for (wxXmlNode *e = a->GetChildren(); e; e = e->GetNext())
+                  if (e->GetName() == "element")
+                    for (wxXmlNode *t = e->GetChildren(); t; t = t->GetNext())
+                      if (t->GetName() == "text") wantText[t->GetNodeContent()]++;
+          }
+        }
+        for (const auto &f : ds.features) {
+          const bool iceArea = f.kind == S411Kind::Area &&
+                               (f.type == "SeaIce" || f.type == "LakeIce" ||
+                                f.type == "StripsAndPatches");
+          if (iceArea)
+            gotFill[S411AreaTokenFor(f.totalConcentration, f.stageOfDevelopment,
+                                     f.fastIce, s.mode, s.cls)]++;
+          S411Alert a = S411Alert::None;
+          if (iceArea)
+            a = S411AreaAlert(f.totalConcentration, f.fastIce, s.cls);
+          else if (f.type != "StripsAndPatches")
+            a = S411FeatureAlert(f.type, f.totalConcentration, f.fastIce, s.cls);
+          if (a != S411Alert::None) gotAlert[S411AlertName(a)]++;
+          if (f.kind == S411Kind::Point && !f.symbol.IsEmpty()) gotSym[f.symbol]++;
+          if (!f.valueText.IsEmpty()) gotText[f.valueText]++;
+        }
+        okFill += wantFill == gotFill;
+        okAlert += wantAlert == gotAlert;
+        okSym += wantSym == gotSym;
+        okText += wantText == gotText;
+      }
+    }
+    std::printf("      (fills %d/%d, alerts %d/%d, symbols %d/%d, text %d/%d)\n",
+                okFill, total, okAlert, total, okSym, total, okText, total);
+    Check(total == 16 && okFill == total,
+          "golden: area colour tokens match the expected display lists");
+    Check(okAlert == total, "golden: alert references match (PS 9.6)");
+    Check(okSym == total, "golden: point symbols match (Annex C)");
+    Check(okText == total, "golden: value texts match (PS 9.7)");
   }
 
   std::printf("\n%s (%d failure%s)\n", g_fail ? "FAILED" : "ALL TESTS PASSED",

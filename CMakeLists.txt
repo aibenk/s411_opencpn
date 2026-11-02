@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
-project(s411_pi VERSION 0.1.0 LANGUAGES CXX)
+project(s411_pi VERSION 0.8.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# OpenCPN for Windows ships msvcp140.dll 14.12 (VS 2017), and plugins run on
+# it: a std::mutex compiled with VS 2022 17.10+ crashes in that runtime
+if(MSVC)
+  add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+endif()
 
 # wxWidgets must match the build OpenCPN itself uses (3.0/3.2).
 # 'aui' is required by ocpn_plugin.h, 'xml' by the GML parser.
@@ -10,15 +16,33 @@ find_package(wxWidgets 3.0 REQUIRED COMPONENTS core base xml gl aui)
 include(${wxWidgets_USE_FILE})
 find_package(OpenGL REQUIRED)
 
+# S-100 Part 15 signature verification: Windows uses CNG (bcrypt/crypt32),
+# elsewhere OpenSSL when available - without it signatures are reported as
+# "not verified" (never as valid).
+if(NOT WIN32)
+  find_package(OpenSSL)
+endif()
+function(s411_crypto target)
+  if(WIN32)
+    target_link_libraries(${target} PRIVATE bcrypt crypt32)
+  elseif(OPENSSL_FOUND)
+    target_compile_definitions(${target} PRIVATE S411_HAVE_OPENSSL)
+    target_link_libraries(${target} PRIVATE OpenSSL::Crypto)
+  endif()
+endfunction()
+
 add_library(s411_pi MODULE
   src/s411_pi.cpp
   src/S411Data.cpp
   src/S411Tess.cpp
   src/S411Router.cpp
-  src/S411Boundary.cpp)
+  src/S411Boundary.cpp
+  src/S411Catalog.cpp
+  src/S411Sigrid.cpp)
 
 target_include_directories(s411_pi PRIVATE api src)
 target_link_libraries(s411_pi PRIVATE ${wxWidgets_LIBRARIES} OpenGL::GL)
+s411_crypto(s411_pi)
 if(TARGET OpenGL::GLU)
   target_link_libraries(s411_pi PRIVATE OpenGL::GLU)
 else()
@@ -56,9 +80,12 @@ if(S411_BUILD_TESTS)
     src/S411Data.cpp
     src/S411Tess.cpp
     src/S411Router.cpp
-    src/S411Boundary.cpp)
+    src/S411Boundary.cpp
+    src/S411Catalog.cpp
+    src/S411Sigrid.cpp)
   target_include_directories(s411_test PRIVATE src)
   target_link_libraries(s411_test PRIVATE ${wxWidgets_LIBRARIES})
+  s411_crypto(s411_test)
   if(TARGET OpenGL::GLU)
     target_link_libraries(s411_test PRIVATE OpenGL::GLU)
   else()

@@ -8,23 +8,32 @@
 
 #include <wx/checkbox.h>
 #include <wx/checklst.h>
+#include <wx/choicdlg.h>
 #include <wx/choice.h>
 #include <wx/dcbuffer.h>
 #include <wx/dcmemory.h>
 #include <wx/fileconf.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
+#include <wx/ffile.h>
+#include <wx/gauge.h>
 #include <wx/graphics.h>
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/slider.h>
+#include <wx/spinctrl.h>
 #include <wx/statline.h>
 #include <wx/stattext.h>
+#include <wx/timer.h>
 #include <wx/tokenzr.h>
 
+#include <algorithm>
+#include <climits>
 #include <cmath>
+#include <ctime>
 
 #include "S411Boundary.h"
+#include "S411Symbols.h"
 
 // opencpn.lib (generated from the installed exe) does not export the
 // out-of-line methods of Plugin_WaypointList, so provide them here.
@@ -39,6 +48,32 @@ WX_DEFINE_LIST(Plugin_WaypointList);
 #else
 #include <GL/gl.h>
 #endif
+
+// joinable worker thread running one function (dataset loading)
+class S411Worker : public wxThread {
+public:
+  explicit S411Worker(std::function<void()> fn)
+      : wxThread(wxTHREAD_JOINABLE), m_fn(std::move(fn)) {}
+
+protected:
+  ExitCode Entry() override {
+    m_fn();
+    return 0;
+  }
+
+private:
+  std::function<void()> m_fn;
+};
+
+// polls the worker thread that loads datasets (see s411_pi::LoadPaths)
+class S411LoadTimer : public wxTimer {
+public:
+  explicit S411LoadTimer(s411_pi *pi) : m_pi(pi) {}
+  void Notify() override { m_pi->PollLoad(); }
+
+private:
+  s411_pi *m_pi;
+};
 
 // ===========================================================================
 // legend for the active display mode / palette (mirrors the web viewer)
@@ -296,10 +331,15 @@ public:
 
     auto *btns = new wxBoxSizer(wxHORIZONTAL);
     m_loadBtn = new wxButton(this, wxID_ANY, "Load data…");
+    m_download = new wxButton(this, wxID_ANY, "Current charts…");
+    m_download->SetToolTip(
+        "Download the newest S-411 chart of every ice service (BSH Ice "
+        "Portal) and load it");
     auto *clear = new wxButton(this, wxID_ANY, "Clear");
     m_help = new wxButton(this, wxID_ANY, "?", wxDefaultPosition, wxSize(28, -1));
     m_help->SetToolTip("Show the guided tour again");
     btns->Add(m_loadBtn, 0, wxRIGHT, b);
+    btns->Add(m_download, 0, wxRIGHT, b);
     btns->Add(clear, 0);
     btns->AddStretchSpacer(1);
     btns->Add(m_help, 0);
@@ -307,6 +347,10 @@ public:
 
     m_status = new wxStaticText(this, wxID_ANY, "");
     s->Add(m_status, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    m_gauge = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition,
+                          wxSize(-1, 8));
+    s->Add(m_gauge, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
+    m_gauge->Hide();
 
     // per-dataset visibility list + zoom/remove
     m_list = new wxCheckListBox(this, wxID_ANY, wxDefaultPosition,
@@ -318,8 +362,11 @@ public:
     dsBtns->Add(zoom, 0, wxRIGHT, b);
     dsBtns->Add(remove, 0);
     s->Add(dsBtns, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    m_warn = new wxStaticText(this, wxID_ANY, "");
+    m_warn->SetForegroundColour(wxColour(190, 0, 0));
+    s->Add(m_warn, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
 
-    auto *grid = new wxFlexGridSizer(4, 2, b, b);
+    auto *grid = new wxFlexGridSizer(5, 2, b, b);
     grid->AddGrowableCol(1, 1);
 
     grid->Add(new wxStaticText(this, wxID_ANY, "Display mode"), 0,
@@ -353,7 +400,21 @@ public:
     m_opacity = new wxSlider(this, wxID_ANY, 67, 10, 100);
     grid->Add(m_opacity, 1, wxEXPAND);
 
+    grid->Add(new wxStaticText(this, wxID_ANY, "Age limit (hours)"), 0,
+              wxALIGN_CENTRE_VERTICAL);
+    m_ageLimit = new wxSpinCtrl(this, wxID_ANY, "72", wxDefaultPosition,
+                                wxDefaultSize, wxSP_ARROW_KEYS, 1, 720, 72);
+    m_ageLimit->SetToolTip(
+        "Ice information older than this is marked on the chart and in the "
+        "dataset list (S-411 PS clause 8.1, default 72 h)");
+    grid->Add(m_ageLimit, 0);
+
     s->Add(grid, 0, wxEXPAND | wxALL, b);
+    m_values = new wxCheckBox(this, wxID_ANY,
+                              "Show ice values (thickness cm, drift kn)");
+    s->Add(m_values, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    m_ageBox = new wxCheckBox(this, wxID_ANY, "Show data age on the chart");
+    s->Add(m_ageBox, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
 
     m_legend = new S411LegendPanel(this, pi);
     s->Add(m_legend, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
@@ -392,6 +453,15 @@ public:
     m_export = new wxButton(this, wxID_ANY, "Export no-go zones");
     rb->Add(m_export, 0);
     s->Add(rb, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
+    auto *rc = new wxBoxSizer(wxHORIZONTAL);
+    m_check = new wxButton(this, wxID_ANY, "Check active route");
+    m_check->SetToolTip(
+        "Check OpenCPN's active (or selected) route against the displayed "
+        "ice: hazardous ice, difficult ice and icebergs per leg");
+    rc->Add(m_check, 0, wxRIGHT, b);
+    auto *clearMarks = new wxButton(this, wxID_ANY, "Clear marks");
+    rc->Add(clearMarks, 0);
+    s->Add(rc, 0, wxLEFT | wxRIGHT | wxBOTTOM, b);
     m_routeStatus = new wxStaticText(this, wxID_ANY, "");
     m_routeStatus->Wrap(320);
     s->Add(m_routeStatus, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, b);
@@ -405,6 +475,15 @@ public:
     });
     m_compute->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnCompute, this);
     m_export->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnExport, this);
+    m_check->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnCheckRoute, this);
+    clearMarks->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
+      m_pi->ClearRouteAlerts();
+      m_pi->Refresh();
+    });
+    m_download->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
+      m_pi->DownloadCurrentCharts();
+      UpdateStatus();
+    });
     m_help->Bind(wxEVT_BUTTON,
                  [this](wxCommandEvent &) { StartTutorial(); });
 
@@ -421,6 +500,9 @@ public:
     m_class->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_pal->Bind(wxEVT_CHOICE, &S411CtrlDialog::OnAny, this);
     m_opacity->Bind(wxEVT_SLIDER, &S411CtrlDialog::OnAny, this);
+    m_ageLimit->Bind(wxEVT_SPINCTRL, &S411CtrlDialog::OnAny, this);
+    m_values->Bind(wxEVT_CHECKBOX, &S411CtrlDialog::OnAny, this);
+    m_ageBox->Bind(wxEVT_CHECKBOX, &S411CtrlDialog::OnAny, this);
     m_loadBtn->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnLoad, this);
     clear->Bind(wxEVT_BUTTON, &S411CtrlDialog::OnClear, this);
     m_list->Bind(wxEVT_CHECKLISTBOX, &S411CtrlDialog::OnListCheck, this);
@@ -442,6 +524,9 @@ public:
     m_class->SetSelection(ci);
     m_pal->SetSelection((int)m_pi->m_palette);
     m_opacity->SetValue(wxMax(10, wxMin(100, m_pi->m_alpha * 100 / 255)));
+    m_ageLimit->SetValue((int)m_pi->m_ageLimitH);
+    m_values->SetValue(m_pi->m_showValues);
+    m_ageBox->SetValue(m_pi->m_showAgeBox);
     m_class->Enable(m_pi->m_mode == S411Mode::Navigational);
     if (m_startLbl) m_startLbl->SetLabel(m_pi->StartLabel());
     if (m_endLbl) m_endLbl->SetLabel(m_pi->EndLabel());
@@ -459,21 +544,37 @@ public:
   }
 
   void UpdateStatus() {
-    m_status->SetLabel(wxString::Format("%zu dataset(s), %zu feature(s) loaded",
-                                        m_pi->DatasetCount(),
-                                        m_pi->FeatureCount()));
-    RebuildList();
-    Layout();
+    const bool busy = m_pi->IsLoading();
+    if (busy) {
+      m_status->SetLabel(m_pi->LoadProgress());
+      m_gauge->Pulse();
+    } else {
+      m_status->SetLabel(wxString::Format(
+          "%zu dataset(s), %zu feature(s) loaded", m_pi->DatasetCount(),
+          m_pi->FeatureCount()));
+    }
+    const bool layout = m_gauge->IsShown() != busy;
+    m_gauge->Show(busy);
+    m_loadBtn->SetLabel(busy ? "Cancel loading" : "Load data…");
+    m_download->Enable(!busy);
+    if (!busy || layout) {
+      RebuildList();
+      m_warn->SetLabel(m_pi->Warnings());
+      m_warn->Wrap(360);
+      Layout();
+      Fit();
+    }
   }
 
 private:
   void RebuildList() {
+    const int sel = m_list->GetSelection();
     m_list->Clear();
     for (const auto &ds : m_pi->Data()) {
-      int i = m_list->Append(wxString::Format(
-          "%s  (%zu features)", ds.title, ds.features.size()));
+      int i = m_list->Append(m_pi->DatasetLabel(ds));
       m_list->Check(i, ds.visible);
     }
+    if (sel >= 0 && sel < (int)m_list->GetCount()) m_list->SetSelection(sel);
   }
   void ToState() {
     m_pi->m_show = m_show->GetValue();
@@ -482,6 +583,12 @@ private:
     m_pi->m_iceClass = cls[wxMax(0, m_class->GetSelection())];
     m_pi->m_palette = (S411Palette)m_pal->GetSelection();
     m_pi->m_alpha = wxMax(26, wxMin(255, m_opacity->GetValue() * 255 / 100));
+    const double limit = m_ageLimit->GetValue();
+    const bool limitChanged = limit != m_pi->m_ageLimitH;
+    m_pi->m_ageLimitH = limit;
+    m_pi->m_showValues = m_values->GetValue();
+    m_pi->m_showAgeBox = m_ageBox->GetValue();
+    if (limitChanged) UpdateStatus();  // list flags depend on the limit
     m_class->Enable(m_pi->m_mode == S411Mode::Navigational);
   }
   void OnAny(wxCommandEvent &) {
@@ -496,12 +603,15 @@ private:
     m_pi->Refresh();
   }
   void OnLoad(wxCommandEvent &) {
-    m_pi->LoadFiles();
-    m_show->SetValue(m_pi->m_show);
+    if (m_pi->IsLoading()) {
+      m_pi->CancelLoad();
+      return;
+    }
+    m_pi->LoadFiles();  // results arrive later via s411_pi::FinishLoad
     UpdateStatus();
-    m_pi->Refresh();
   }
   void OnClear(wxCommandEvent &) {
+    if (m_pi->IsLoading()) m_pi->CancelLoad();
     m_pi->ClearData();
     m_show->SetValue(false);
     UpdateStatus();
@@ -510,7 +620,17 @@ private:
   void OnListCheck(wxCommandEvent &e) {
     const int i = e.GetInt();
     if (i >= 0 && (size_t)i < m_pi->Data().size()) {
-      m_pi->Data()[i].visible = m_list->IsChecked(i);
+      S411Dataset &ds = m_pi->Data()[i];
+      if (m_list->IsChecked(i) && ds.signature == S411SigState::Invalid) {
+        m_list->Check(i, false);  // PS clause 11.3 rule 4
+        wxMessageBox("This dataset failed the digital signature check and "
+                     "must not be displayed:\n" + ds.signatureNote,
+                     "S-411 signature", wxOK | wxICON_ERROR, this);
+        return;
+      }
+      ds.visible = m_list->IsChecked(i);
+      m_pi->DataChanged();
+      UpdateStatus();
       m_pi->Refresh();
     }
   }
@@ -521,6 +641,7 @@ private:
     const int i = m_list->GetSelection();
     if (i < 0 || (size_t)i >= m_pi->Data().size()) return;
     m_pi->Data().erase(m_pi->Data().begin() + i);
+    m_pi->DataChanged();
     if (m_pi->Data().empty()) {
       m_pi->m_show = false;
       m_show->SetValue(false);
@@ -535,6 +656,18 @@ private:
     Layout();
     Fit();
   }
+  void OnCheckRoute(wxCommandEvent &) {
+    const wxString r = m_pi->CheckActiveRoute();
+    wxDialog dlg(this, wxID_ANY, "S-411 route ice check", wxDefaultPosition,
+                 wxSize(460, 380), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+    auto *sz = new wxBoxSizer(wxVERTICAL);
+    auto *t = new wxTextCtrl(&dlg, wxID_ANY, r, wxDefaultPosition,
+                             wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
+    sz->Add(t, 1, wxEXPAND | wxALL, 5);
+    sz->Add(dlg.CreateButtonSizer(wxOK), 0, wxALIGN_RIGHT | wxALL, 5);
+    dlg.SetSizer(sz);
+    dlg.ShowModal();
+  }
   void OnExport(wxCommandEvent &) {
     m_routeStatus->SetLabel(m_pi->ExportHazards());
     m_routeStatus->Wrap(320);
@@ -546,14 +679,18 @@ private:
   wxCheckBox *m_show;
   wxChoice *m_mode, *m_class, *m_pal;
   wxSlider *m_opacity;
-  wxStaticText *m_status;
+  wxSpinCtrl *m_ageLimit;
+  wxCheckBox *m_values, *m_ageBox;
+  wxGauge *m_gauge;
+  wxStaticText *m_status, *m_warn;
   wxCheckListBox *m_list;
   S411LegendPanel *m_legend;
   wxStaticText *m_startLbl = nullptr, *m_endLbl = nullptr,
                *m_routeStatus = nullptr;
   wxCheckBox *m_avoidCaution = nullptr;
   wxButton *m_loadBtn = nullptr, *m_export = nullptr, *m_help = nullptr,
-           *m_pickStart = nullptr, *m_compute = nullptr;
+           *m_pickStart = nullptr, *m_compute = nullptr,
+           *m_download = nullptr, *m_check = nullptr;
   S411Tutorial *m_tutorial = nullptr;
 
 public:
@@ -571,12 +708,21 @@ public:
          "Open S-411 datasets: single GML files, a whole exchange set "
          "(pick its CATALOG.XML) or a .zip archive. The chart jumps to the "
          "data once it loads."},
+        {m_download, "Current ice charts",
+         "Downloads the newest chart of every ice service (Canada, USA, "
+         "Norway, Denmark, Russia, Germany ...) and loads it. Loading runs "
+         "in the background; the bar below shows progress."},
         {m_show, "Show / hide",
          "Toggle the ice overlay on the chart. Loaded data stays in memory "
          "when hidden."},
         {m_list, "Your datasets",
-         "Each loaded dataset is listed here. Tick to show/hide it, or use "
-         "Zoom to data and Remove below the list."},
+         "Each dataset shows its producer, analysis time, age and signature "
+         "state. Outdated data, forecasts and data older than 30 days start "
+         "hidden - tick to show. Where producers overlap, untick the one "
+         "you do not want."},
+        {m_ageLimit, "Age limit",
+         "Data older than this many hours is flagged in the list and in the "
+         "age box on the chart."},
         {m_mode, "Display mode",
          "Colour the ice by concentration, by stage of development, or as a "
          "navigational traffic light (green/amber/red)."},
@@ -593,6 +739,10 @@ public:
         {m_compute, "Compute / recompute",
          "Computes the route on the visible datasets. Recomputing replaces "
          "the previous ice route rather than stacking a new one."},
+        {m_check, "Check a route",
+         "Checks OpenCPN's active route leg by leg for hazardous ice, "
+         "difficult ice and icebergs for your ice class, lists the legs and "
+         "marks the positions on the chart."},
         {m_export, "Weather Routing",
          "With the ocpn_draw_pi plugin installed, export the dangerous ice "
          "as exclusion boundaries so the Weather Routing plugin avoids them "
@@ -639,9 +789,9 @@ wxString s411_pi::GetLongDescription() {
          "colour code. Switchable display mode (concentration / stage of\n"
          "development / ice-class traffic light), vessel ice class and\n"
          "day/dusk/night palette, matching the S-411 web viewer.\n"
-         "Click an ice feature for its attribute report; the control panel\n"
-         "offers a legend, per-dataset visibility, zoom-to-data and fill\n"
-         "opacity.";
+         "Shows the age of the ice information, applies the dataset\n"
+         "precedence rules, verifies S-100 signatures, draws the Annex C\n"
+         "symbols, checks routes for ice and downloads current charts.";
 }
 
 void s411_pi::MakeIcon() {
@@ -688,6 +838,11 @@ int s411_pi::Init(void) {
 
 bool s411_pi::DeInit(void) {
   SaveConfig();
+  m_cancel = true;  // a running load stops after its current file
+  JoinLoader();
+  delete m_loadTimer;
+  m_loadTimer = nullptr;
+  m_loading = false;
   if (m_dialog) {
     m_dialog->Destroy();
     m_dialog = nullptr;
@@ -703,39 +858,146 @@ bool s411_pi::DeInit(void) {
   return true;
 }
 
+// ---------------------------------------------------------------------------
+// loading: a worker thread parses and tessellates (the NIC Arctic chart
+// still takes a few seconds), a timer on the GUI thread merges the result
+// ---------------------------------------------------------------------------
 void s411_pi::LoadFiles() {
+  if (m_loading) return;
   wxFileDialog dlg(
       GetOCPNCanvasWindow(), "Open S-411 data", m_lastDir, "",
-      "S-411 data (*.gml;*.xml;*.zip;CATALOG.XML)|"
-      "*.gml;*.GML;*.xml;*.XML;*.zip;*.ZIP|"
+      "S-411 / SIGRID-3 data (*.gml;*.xml;*.zip;*.gz;CATALOG.XML;*.shp)|"
+      "*.gml;*.GML;*.xml;*.XML;*.zip;*.ZIP;*.gz;*.GZ;*.shp;*.SHP|"
       "All files|*.*",
       wxFD_OPEN | wxFD_MULTIPLE | wxFD_FILE_MUST_EXIST);
   if (dlg.ShowModal() != wxID_OK) return;
   wxArrayString paths;
   dlg.GetPaths(paths);
   m_lastDir = dlg.GetDirectory();
+  LoadPaths(paths);
+}
 
-  wxString errors;
-  size_t before = m_data.size();
-  for (size_t i = 0; i < paths.GetCount(); i++) {
-    wxFileName fn(paths[i]);
-    wxString ext = fn.GetExt().Lower();
-    if (ext == "zip") {
-      LoadS411Zip(paths[i], m_data, errors);
-    } else if (fn.GetFullName().Upper() == "CATALOG.XML") {
-      LoadS411ExchangeSet(paths[i], m_data, errors);
-    } else {
-      S411Dataset ds;
-      wxString err;
-      if (LoadS411File(paths[i], ds, err))
-        m_data.push_back(ds);
-      else
-        errors += err + "\n";
-    }
+void s411_pi::LoadPaths(const wxArrayString &pathsIn) {
+  if (m_loading || pathsIn.IsEmpty()) return;
+  JoinLoader();
+  m_loading = true;
+  m_loadDone = false;
+  m_cancel = false;
+  {
+    wxMutexLocker lk(m_loadMx);
+    m_loadOut.clear();
+    m_loadErrors.Clear();
+    m_loadMsg = "Loading...";
   }
+  // wxString copies are not thread-safe to share: hand over deep copies
+  std::vector<wxString> paths;
+  for (const auto &p : pathsIn) paths.push_back(wxString(p.wc_str()));
+  m_loader = new S411Worker([this, paths]() {
+    std::vector<S411Dataset> out;
+    wxString errors;
+    for (size_t i = 0; i < paths.size() && !m_cancel; i++) {
+      const wxFileName fn(paths[i]);
+      {
+        wxMutexLocker lk(m_loadMx);
+        m_loadMsg = wxString::Format("Loading %zu of %zu: %s", i + 1,
+                                     paths.size(), fn.GetFullName());
+      }
+      S411LoadPath(paths[i], out, errors);
+    }
+    wxMutexLocker lk(m_loadMx);
+    m_loadOut = std::move(out);
+    m_loadErrors = errors;
+    m_loadDone = true;
+  });
+  if (m_loader->Run() != wxTHREAD_NO_ERROR) {  // no thread: load right here
+    delete m_loader;
+    m_loader = nullptr;
+    std::vector<S411Dataset> out;
+    wxString errors;
+    for (const auto &p : paths) S411LoadPath(p, out, errors);
+    m_loadOut = std::move(out);
+    m_loadErrors = errors;
+    FinishLoad();
+    return;
+  }
+  if (!m_loadTimer) m_loadTimer = new S411LoadTimer(this);
+  m_loadTimer->Start(200);
+  if (m_dialog) m_dialog->UpdateStatus();
+}
+
+wxString s411_pi::LoadProgress() {
+  wxMutexLocker lk(m_loadMx);
+  return m_loadMsg;
+}
+
+void s411_pi::PollLoad() {
+  if (!m_loadDone) {
+    if (m_dialog) m_dialog->UpdateStatus();
+    return;
+  }
+  m_loadTimer->Stop();
+  JoinLoader();
+  FinishLoad();
+}
+
+void s411_pi::JoinLoader() {
+  if (!m_loader) return;
+  m_loader->Wait();
+  delete m_loader;
+  m_loader = nullptr;
+}
+
+void s411_pi::FinishLoad() {
+  std::vector<S411Dataset> got;
+  wxString errors;
+  {
+    wxMutexLocker lk(m_loadMx);
+    got.swap(m_loadOut);
+    errors = m_loadErrors;
+  }
+  const bool cancelled = m_cancel;
+  m_loading = false;
+  if (cancelled) got.clear();
+
+  // PS clause 8.1: outdated data only on request, > 30 days not by default
+  const time_t now = time(nullptr);
+  size_t hiddenAge = 0, hiddenSig = 0, forecasts = 0;
+  const size_t before = m_data.size();
+  for (auto &ds : got) {
+    if (ds.signature == S411SigState::Invalid) hiddenSig++;
+    else if (ds.forecastTime) forecasts++;
+    const S411Age a = S411DatasetAge(ds, now, m_ageLimitH);
+    if (ds.visible && (a == S411Age::Outdated || a == S411Age::Expired)) {
+      ds.visible = false;
+      hiddenAge++;
+    }
+    m_data.push_back(std::move(ds));
+  }
+  DataChanged();
+
+  wxString info;
+  if (hiddenAge)
+    info += wxString::Format(
+        "%zu dataset(s) are outdated or older than 30 days and are not "
+        "displayed (S-411 PS clause 8.1). Tick them in the dataset list to "
+        "show them anyway.\n",
+        hiddenAge);
+  if (forecasts)
+    info += wxString::Format(
+        "%zu forecast dataset(s) loaded but not displayed by default - tick "
+        "them in the dataset list to show a forecast.\n",
+        forecasts);
+  if (hiddenSig)
+    info += wxString::Format(
+        "%zu dataset(s) failed the digital signature check and are not "
+        "displayed (S-411 PS clause 11.3).\n",
+        hiddenSig);
   if (!errors.IsEmpty())
     wxMessageBox(errors, "S-411: some files could not be loaded",
                  wxOK | wxICON_WARNING, GetOCPNCanvasWindow());
+  if (!info.IsEmpty())
+    wxMessageBox(info, "S-411 data loaded", wxOK | wxICON_INFORMATION,
+                 GetOCPNCanvasWindow());
   if (m_data.size() > before) {
     m_show = true;  // show as soon as data arrives
     // jump to the freshly loaded data so it is never invisibly off-screen
@@ -748,6 +1010,179 @@ void s411_pi::LoadFiles() {
     }
     JumpToBox(la, lA, lo, lO);
   }
+  if (m_dialog) {
+    m_dialog->FromState();
+    m_dialog->UpdateStatus();
+  }
+  Refresh();
+}
+
+void s411_pi::DataChanged() { S411ApplyPrecedence(m_data); }
+
+wxString s411_pi::DatasetLabel(const S411Dataset &ds) const {
+  const time_t now = time(nullptr);
+  wxString s = ds.title;
+  wxString meta = ds.producer;
+  if (ds.analysisTime) {
+    const double h = difftime(now, ds.analysisTime) / 3600.0;
+    meta += (meta.IsEmpty() ? "" : ", ") +
+            S411FormatUtc(ds.analysisTime, ds.timeApprox) +
+            (ds.timeApprox ? "" : " UTC") +
+            (h < 48 ? wxString::Format(", %.0f h old", h)
+                    : wxString::Format(", %.0f days old", h / 24.0));
+  } else {
+    meta += (meta.IsEmpty() ? "" : ", ") + wxString("age unknown");
+  }
+  meta += ", " + S411SigLabel(ds.signature);
+  s += "  (" + meta + ")";
+  if (ds.forecastTime)
+    s += " [forecast for " + S411FormatUtc(ds.forecastTime) + " UTC]";
+  switch (S411DatasetAge(ds, now, m_ageLimitH)) {
+    case S411Age::Outdated: s += " [OUTDATED]"; break;
+    case S411Age::Expired: s += " [older than 30 days]"; break;
+    case S411Age::OverLimit: s += " [older than age limit]"; break;
+    default: break;
+  }
+  if (!ds.supersededBy.IsEmpty()) s += " [superseded by " + ds.supersededBy + "]";
+  return s;
+}
+
+wxString s411_pi::Warnings() const {
+  wxString w;
+  const wxString ov = S411OverlappingProducers(m_data);
+  if (!ov.IsEmpty())
+    w += "Data of several producers overlap (" + ov +
+         ") - untick the producer you do not want in an area.\n";
+  size_t old = 0;
+  const time_t now = time(nullptr);
+  for (const auto &d : m_data) {
+    if (!d.visible) continue;
+    const S411Age a = S411DatasetAge(d, now, m_ageLimitH);
+    if (a == S411Age::Outdated || a == S411Age::Expired ||
+        a == S411Age::OverLimit)
+      old++;
+  }
+  if (old)
+    w += wxString::Format("%zu displayed dataset(s) are outdated or older "
+                          "than the age limit.\n",
+                          old);
+  w.Trim();
+  return w;
+}
+
+// ---------------------------------------------------------------------------
+// current charts of the ice services (IMPROVEMENTS 4.2): the BSH Ice Portal
+// lists every service's S-411 zips in one directory; the newest per service
+// is offered, downloaded with OpenCPN's downloader and loaded
+// ---------------------------------------------------------------------------
+static const char *kIcePortal = "https://www.bsis-ice.de/IcePortal/S411/";
+
+void s411_pi::DownloadCurrentCharts() {
+  if (m_loading) return;
+  wxString base = kIcePortal;
+  if (wxFileConfig *cfg = GetOCPNConfigObject()) {
+    cfg->SetPath("/PlugIns/S411");
+    base = cfg->Read("DownloadUrl", base);
+  }
+  if (!base.EndsWith("/")) base += "/";
+  const wxString dir = *GetpPrivateApplicationDataLocation() +
+                       wxFileName::GetPathSeparator() + "s411_pi" +
+                       wxFileName::GetPathSeparator() + "downloads";
+  wxFileName::Mkdir(dir, wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+  const wxString index = dir + wxFileName::GetPathSeparator() + "index.html";
+  if (OCPN_downloadFile(base, index, "S-411 ice charts",
+                        "Reading the list of current ice charts...",
+                        wxNullBitmap, GetOCPNCanvasWindow(),
+                        OCPN_DLDS_ELAPSED_TIME | OCPN_DLDS_CAN_ABORT |
+                            OCPN_DLDS_AUTO_CLOSE,
+                        30) != OCPN_DL_NO_ERROR) {
+    wxMessageBox("Could not read " + base, "S-411 ice charts",
+                 wxOK | wxICON_WARNING, GetOCPNCanvasWindow());
+    return;
+  }
+  wxString html;
+  wxFFile(index, "rb").ReadAll(&html, wxConvUTF8);
+
+  // href="....zip" -> newest per service (the name without its date)
+  struct Chart { wxString file, date; };
+  std::map<wxString, Chart> newest;
+  int pos = 0;
+  while ((pos = html.find("href=\"", pos)) != wxNOT_FOUND) {
+    pos += 6;
+    const int end = html.find('"', pos);
+    if (end == wxNOT_FOUND) break;
+    const wxString f = html.Mid(pos, end - pos);
+    pos = end;
+    if (!f.Lower().EndsWith(".zip") || f.Contains("/")) continue;
+    wxString key, date;
+    for (size_t i = 0; i < f.length(); i++) {
+      size_t n = 0;
+      while (i + n < f.length() && wxIsdigit(f[i + n])) n++;
+      if (n == 8 && date.IsEmpty() && f.Mid(i, 2) == "20") {
+        date = f.Mid(i, 8);
+        size_t t = i + 8;  // optional THHMMZ
+        if (t < f.length() && f[t] == 'T') {
+          while (t + 1 < f.length() && (wxIsdigit(f[t + 1]) || f[t + 1] == 'Z'))
+            t++;
+          date += f.Mid(i + 8, t + 1 - (i + 8));
+          i = t;
+        } else {
+          i += 7;
+        }
+        key += "#";
+        continue;
+      }
+      key += f[i];
+      if (n > 1) { key += f.Mid(i + 1, n - 1); i += n - 1; }
+    }
+    if (date.IsEmpty()) continue;
+    auto it = newest.find(key);
+    if (it == newest.end() || date > it->second.date) newest[key] = {f, date};
+  }
+  if (newest.empty()) {
+    wxMessageBox("No S-411 charts found at " + base, "S-411 ice charts",
+                 wxOK | wxICON_INFORMATION, GetOCPNCanvasWindow());
+    return;
+  }
+  wxArrayString labels, files;
+  for (const auto &kv : newest) {
+    const wxString &d = kv.second.date;
+    labels.Add(wxString::Format("%s   (%s-%s-%s)", kv.second.file, d.Mid(0, 4),
+                                d.Mid(4, 2), d.Mid(6, 2)));
+    files.Add(kv.second.file);
+  }
+  wxMultiChoiceDialog pick(GetOCPNCanvasWindow(),
+                           "Newest chart of every ice service on the BSH Ice "
+                           "Portal. Select the charts to download and load:",
+                           "S-411: download current ice charts", labels);
+  if (pick.ShowModal() != wxID_OK) return;
+  const wxArrayInt sel = pick.GetSelections();
+  wxArrayString got;
+  wxString failed;
+  for (int i : sel) {
+    const wxString out = dir + wxFileName::GetPathSeparator() + files[i];
+    if (wxFileExists(out)) {  // already downloaded earlier: same content
+      got.Add(out);
+      continue;
+    }
+    const _OCPN_DLStatus st = OCPN_downloadFile(
+        base + files[i], out, "S-411 ice charts", "Downloading " + files[i],
+        wxNullBitmap, GetOCPNCanvasWindow(),
+        OCPN_DLDS_ELAPSED_TIME | OCPN_DLDS_CAN_ABORT | OCPN_DLDS_AUTO_CLOSE |
+            OCPN_DLDS_SIZE,
+        120);
+    if (st == OCPN_DL_NO_ERROR) {
+      got.Add(out);
+    } else {
+      wxRemoveFile(out);  // never keep a partial download
+      failed += files[i] + "\n";
+      if (st == OCPN_DL_ABORTED) break;
+    }
+  }
+  if (!failed.IsEmpty())
+    wxMessageBox("Download failed:\n" + failed, "S-411 ice charts",
+                 wxOK | wxICON_WARNING, GetOCPNCanvasWindow());
+  LoadPaths(got);
 }
 
 // jump the chart so the given lat/lon box fills ~80% of the canvas
@@ -784,6 +1219,7 @@ void s411_pi::ZoomToData(int idx) {
 
 void s411_pi::ClearData() {
   m_data.clear();
+  m_routeAlerts.clear();
   m_show = false;
 }
 
@@ -866,6 +1302,18 @@ void s411_pi::ShowPickReport(const std::vector<S411Hit> &hits, double lat,
     txt += h.feature->type;
     if (h.feature->fastIce) txt += "   [fast ice]";
     txt += "\n  dataset: " + h.ds->title + "\n";
+    // PS clause 4.6: producer, analysis time and age at the picked position
+    txt += "  producer: " +
+           (h.ds->producer.IsEmpty() ? wxString("unknown") : h.ds->producer) +
+           (h.ds->agency.IsEmpty() || h.ds->agency == h.ds->producer
+                ? wxString()
+                : " (" + h.ds->agency + ")") +
+           "\n";
+    txt += "  " + S411AgeText(*h.ds, time(nullptr)) + "\n";
+    txt += "  signature: " + S411SigLabel(h.ds->signature) +
+           (h.ds->signatureNote.IsEmpty() ? wxString()
+                                          : " - " + h.ds->signatureNote) +
+           "\n";
     for (const auto &kv : h.feature->attrs) {
       txt += "  " + kv.first + " = " + kv.second;
       const wxString n = kv.first.Lower();
@@ -1051,6 +1499,79 @@ wxString s411_pi::ExportHazards() {
 
 void s411_pi::ClearHazards() { DeleteOurBoundaries(); }
 
+static wxString DegMin(double v, bool lat) {
+  const char h = lat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
+  v = std::fabs(v);
+  const int d = (int)v;
+  return wxString::Format(lat ? "%02d°%04.1f'%c" : "%03d°%04.1f'%c", d,
+                          (v - d) * 60.0, h);
+}
+
+wxString s411_pi::CheckActiveRoute() {
+  m_routeAlerts.clear();
+  wxString guid = GetActiveRouteGUID();
+  wxString which = "active route";
+  if (guid.IsEmpty()) {
+    guid = GetSelectedRouteGUID_Plugin();
+    which = "selected route";
+  }
+  if (guid.IsEmpty()) {
+    guid = m_lastRouteGuid;
+    which = "last S-411 ice route";
+  }
+  if (guid.IsEmpty())
+    return "No route to check: activate or select a route in OpenCPN first.";
+  std::unique_ptr<PlugIn_Route> route = GetRoute_Plugin(guid);
+  if (!route || !route->pWaypointList)
+    return "The route could not be read from OpenCPN.";
+  std::vector<S411Pos> wps;
+  std::vector<wxString> names;
+  for (auto node = route->pWaypointList->GetFirst(); node;
+       node = node->GetNext()) {
+    const PlugIn_Waypoint *wp = node->GetData();
+    wps.push_back({wp->m_lat, wp->m_lon});
+    names.push_back(wp->m_MarkName);
+  }
+  if (wps.size() < 2) return "The route has fewer than two waypoints.";
+  bool anyVisible = false;
+  for (const auto &d : m_data) anyVisible |= d.visible && !d.features.empty();
+  if (!anyVisible)
+    return "No ice data displayed - load and show S-411 data first.";
+
+  std::vector<S411RouteAlert> alerts;
+  S411CheckRoute(m_data, wps, m_iceClass, 1.0, alerts);
+  m_routeAlerts = alerts;
+  Refresh();
+
+  wxString name = route->m_NameString.IsEmpty() ? which : route->m_NameString;
+  wxString txt = wxString::Format(
+      "Ice check of %s '%s'\n%zu legs, vessel ice class: %s\n"
+      "Only displayed ice data is checked (S-411 PS clauses 8.1, 9.6).\n\n",
+      which, name, wps.size() - 1,
+      m_iceClass.IsEmpty() ? wxString("none") : m_iceClass);
+  if (alerts.empty())
+    return txt + "No ice alerts on this route.";
+  for (const auto &a : alerts) {
+    const wxString from = names[a.leg].IsEmpty()
+                              ? wxString::Format("wp%zu", a.leg + 1)
+                              : names[a.leg];
+    const wxString to = names[a.leg + 1].IsEmpty()
+                            ? wxString::Format("wp%zu", a.leg + 2)
+                            : names[a.leg + 1];
+    txt += wxString::Format("Leg %zu (%s -> %s): %s\n  at %s %s - %s\n  [%s]\n\n",
+                            a.leg + 1, from, to, S411AlertName(a.alert),
+                            DegMin(a.where.lat, true),
+                            DegMin(a.where.lon, false), a.feature, a.dataset);
+  }
+  size_t hz = 0;
+  for (const auto &a : alerts) hz += a.alert == S411Alert::IceHazard;
+  txt += wxString::Format(
+      "%zu alert(s), %zu of them IceHazardForVessel. The positions are "
+      "marked on the chart.",
+      alerts.size(), hz);
+  return txt;
+}
+
 // ---------------------------------------------------------------------------
 // configuration persistence
 // ---------------------------------------------------------------------------
@@ -1072,6 +1593,11 @@ void s411_pi::LoadConfig() {
   cfg->Read("RouteCautionPenalty", &pen, 4.0);
   m_route.cautionPenalty = wxMax(1.0, wxMin(50.0, pen));
   cfg->Read("TutorialSeen", &m_tutorialSeen, false);
+  double lim = 72;
+  cfg->Read("AgeLimitHours", &lim, 72.0);
+  m_ageLimitH = wxMax(1.0, wxMin(720.0, lim));
+  cfg->Read("ShowValues", &m_showValues, true);
+  cfg->Read("ShowAgeBox", &m_showAgeBox, true);
 }
 
 void s411_pi::SaveConfig() {
@@ -1086,6 +1612,9 @@ void s411_pi::SaveConfig() {
   cfg->Write("RouteAvoidCaution", m_route.avoidCaution);
   cfg->Write("RouteCautionPenalty", m_route.cautionPenalty);
   cfg->Write("TutorialSeen", m_tutorialSeen);
+  cfg->Write("AgeLimitHours", m_ageLimitH);
+  cfg->Write("ShowValues", m_showValues);
+  cfg->Write("ShowAgeBox", m_showAgeBox);
   cfg->Flush();
 }
 
@@ -1096,39 +1625,60 @@ static double WorldShift(double lonCentre, double clon) {
   return 360.0 * std::floor((lonCentre - clon + 180.0) / 360.0);
 }
 
-static void RingToPix(PlugIn_ViewPort *vp, const std::vector<S411Pos> &ring,
-                      std::vector<wxPoint> &out) {
+// every world copy (shift by a multiple of 360 deg) of [lonMin, lonMax]
+// that meets the view - a 360 deg wide circumpolar area needs two copies
+// where the view straddles its seam
+static void WorldShifts(double lonMin, double lonMax, PlugIn_ViewPort *vp,
+                        std::vector<double> &ks) {
+  ks.clear();
+  double vmin = vp->lon_min, vmax = vp->lon_max;
+  if (vmax < vmin) vmax += 360.0;  // view across the antimeridian
+  const double base = WorldShift((lonMin + lonMax) / 2.0, vp->clon);
+  for (int i = -1; i <= 1; i++) {
+    const double k = base + 360.0 * i;
+    if (lonMax - k >= vmin - 0.5 && lonMin - k <= vmax + 0.5) ks.push_back(k);
+  }
+}
+
+static bool LatCulled(const S411Feature &f, PlugIn_ViewPort *vp) {
+  return f.latMax < vp->lat_min - 0.5 || f.latMin > vp->lat_max + 0.5;
+}
+
+// projection with the latitude kept off the Mercator singularity (pole
+// closures of circumpolar rings sit at +/-90)
+static wxPoint Pix(PlugIn_ViewPort *vp, double lat, double lon) {
+  wxPoint p;
+  GetCanvasPixLL(vp, &p, std::max(-89.5, std::min(89.5, lat)), lon);
+  return p;
+}
+
+static bool IsPole(const S411Pos &p) { return std::fabs(p.lat) >= 90.0 - 1e-9; }
+
+// a ring as one polygon (for fills)
+static void RingPoly(PlugIn_ViewPort *vp, const std::vector<S411Pos> &ring,
+                     double k, std::vector<wxPoint> &out) {
   out.clear();
-  if (ring.empty()) return;
-  double lmin = ring[0].lon, lmax = ring[0].lon;
-  for (const auto &p : ring) {
-    if (p.lon < lmin) lmin = p.lon;
-    if (p.lon > lmax) lmax = p.lon;
-  }
-  const double k = WorldShift((lmin + lmax) / 2.0, vp->clon);
   out.reserve(ring.size());
-  for (const auto &p : ring) {
-    wxPoint px;
-    GetCanvasPixLL(vp, &px, p.lat, p.lon - k);
-    out.push_back(px);
+  for (const auto &p : ring) out.push_back(Pix(vp, p.lat, p.lon - k));
+}
+
+// a ring or line as outline strips, split at the synthetic pole closure
+static void Strips(PlugIn_ViewPort *vp, const std::vector<S411Pos> &ring,
+                   double k, bool closed,
+                   std::vector<std::vector<wxPoint>> &out) {
+  out.clear();
+  std::vector<wxPoint> s;
+  const size_t n = ring.size() + (closed ? 1 : 0);
+  for (size_t i = 0; i < n; i++) {
+    const S411Pos &p = ring[i % ring.size()];
+    if (IsPole(p)) {
+      if (s.size() >= 2) out.push_back(s);
+      s.clear();
+      continue;
+    }
+    s.push_back(Pix(vp, p.lat, p.lon - k));
   }
-}
-
-static wxPoint PointToPix(PlugIn_ViewPort *vp, const S411Pos &pos) {
-  wxPoint px;
-  GetCanvasPixLL(vp, &px, pos.lat, pos.lon - WorldShift(pos.lon, vp->clon));
-  return px;
-}
-
-static bool Culled(const S411Feature &f, PlugIn_ViewPort *vp) {
-  if (f.latMax < vp->lat_min - 0.5 || f.latMin > vp->lat_max + 0.5)
-    return true;
-  const double c = (f.lonMin + f.lonMax) / 2.0;
-  const double half = (f.lonMax - f.lonMin) / 2.0;
-  const double cs = c - WorldShift(c, vp->clon);
-  if (cs + half < vp->lon_min - 0.5 || cs - half > vp->lon_max + 0.5)
-    return true;
-  return false;
+  if (s.size() >= 2) out.push_back(s);
 }
 
 // fill colour for an area feature under the current mode/class/palette
@@ -1155,12 +1705,329 @@ static wxPenStyle DashToPen(S411Dash d) {
   }
 }
 
+// screen pixels per millimetre (symbol sizes are given in mm, Annex C)
+static double PxPerMm() {
+  const double mm = PlugInGetDisplaySizeMM();
+  const int w = wxGetDisplaySize().x;
+  const double v = mm > 50 ? w / mm : 96.0 / 25.4;
+  return std::max(2.5, std::min(12.0, v));
+}
+
+std::vector<size_t> s411_pi::DrawOrder() const {
+  std::vector<size_t> idx;
+  for (size_t i = 0; i < m_data.size(); i++)
+    if (m_data[i].visible) idx.push_back(i);
+  std::stable_sort(idx.begin(), idx.end(), [this](size_t a, size_t b) {
+    return m_data[a].analysisTime < m_data[b].analysisTime;
+  });
+  return idx;
+}
+
+// ---------------------------------------------------------------------------
+// painter: the few primitives the symbol / text / marker overlay needs, so
+// it is written once for both wxDC and OpenGL
+// ---------------------------------------------------------------------------
+struct S411Painter {
+  virtual ~S411Painter() {}
+  virtual void Lines(const std::vector<wxRealPoint> &p, const wxColour &c,
+                     double width) = 0;
+  virtual void Fill(const std::vector<wxRealPoint> &p, const wxColour &c) = 0;
+  virtual void Box(const wxRect &r, const wxColour &c) = 0;  // may be translucent
+  virtual void Text(const wxString &t, int x, int y, const wxColour &c) = 0;
+  virtual wxSize Extent(const wxString &t) = 0;
+};
+
+static wxFont OverlayFont() {
+  return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL,
+                wxFONTWEIGHT_NORMAL);
+}
+
+class S411DCPainter : public S411Painter {
+public:
+  explicit S411DCPainter(wxDC &dc) : m_dc(dc) { m_dc.SetFont(OverlayFont()); }
+  void Lines(const std::vector<wxRealPoint> &p, const wxColour &c,
+             double width) override {
+    std::vector<wxPoint> q;
+    for (const auto &r : p) q.push_back(wxPoint(wxRound(r.x), wxRound(r.y)));
+    m_dc.SetPen(wxPen(c, std::max(1, (int)std::lround(width))));
+    if (q.size() >= 2) m_dc.DrawLines((int)q.size(), q.data());
+  }
+  void Fill(const std::vector<wxRealPoint> &p, const wxColour &c) override {
+    std::vector<wxPoint> q;
+    for (const auto &r : p) q.push_back(wxPoint(wxRound(r.x), wxRound(r.y)));
+    m_dc.SetPen(wxPen(c, 1));
+    m_dc.SetBrush(wxBrush(c));
+    if (q.size() >= 3) m_dc.DrawPolygon((int)q.size(), q.data());
+  }
+  void Box(const wxRect &r, const wxColour &c) override {
+    m_dc.SetPen(wxPen(wxColour(120, 120, 120), 1));
+    m_dc.SetBrush(wxBrush(wxColour(c.Red(), c.Green(), c.Blue())));
+    m_dc.DrawRectangle(r);
+  }
+  void Text(const wxString &t, int x, int y, const wxColour &c) override {
+    m_dc.SetTextForeground(c);
+    m_dc.DrawText(t, x, y);
+  }
+  wxSize Extent(const wxString &t) override { return m_dc.GetTextExtent(t); }
+
+private:
+  wxDC &m_dc;
+};
+
+// OpenGL text: rendered once into an RGBA image (alpha from coverage) and
+// blitted with glDrawPixels; small cache keyed by text + colour
+class S411GLPainter : public S411Painter {
+public:
+  void Lines(const std::vector<wxRealPoint> &p, const wxColour &c,
+             double width) override {
+    glColor4ub(c.Red(), c.Green(), c.Blue(), c.Alpha());
+    glLineWidth((GLfloat)std::max(1.0, width));
+    glBegin(GL_LINE_STRIP);
+    for (const auto &r : p) glVertex2d(r.x, r.y);
+    glEnd();
+  }
+  void Fill(const std::vector<wxRealPoint> &p, const wxColour &c) override {
+    glColor4ub(c.Red(), c.Green(), c.Blue(), c.Alpha());
+    glBegin(GL_TRIANGLE_FAN);
+    for (const auto &r : p) glVertex2d(r.x, r.y);
+    glEnd();
+  }
+  void Box(const wxRect &r, const wxColour &c) override {
+    glColor4ub(c.Red(), c.Green(), c.Blue(), c.Alpha());
+    glBegin(GL_QUADS);
+    glVertex2i(r.x, r.y);
+    glVertex2i(r.x + r.width, r.y);
+    glVertex2i(r.x + r.width, r.y + r.height);
+    glVertex2i(r.x, r.y + r.height);
+    glEnd();
+  }
+  void Text(const wxString &t, int x, int y, const wxColour &c) override {
+    const Img &im = Get(t, c);
+    if (im.w <= 0) return;
+    glRasterPos2i(x, y);
+    glPixelZoom(1.0f, -1.0f);  // image rows top-down from the raster pos
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glDrawPixels(im.w, im.h, GL_RGBA, GL_UNSIGNED_BYTE, im.rgba.data());
+    glPixelZoom(1.0f, 1.0f);
+  }
+  wxSize Extent(const wxString &t) override {
+    const Img &im = Get(t, *wxBLACK);
+    return wxSize(im.w, im.h);
+  }
+
+private:
+  struct Img {
+    int w = 0, h = 0;
+    std::vector<unsigned char> rgba;
+  };
+  static std::map<wxString, Img> &Cache() {
+    static std::map<wxString, Img> c;
+    return c;
+  }
+  const Img &Get(const wxString &t, const wxColour &c) {
+    const wxString key = c.GetAsString(wxC2S_HTML_SYNTAX) + t;
+    auto &cache = Cache();
+    auto it = cache.find(key);
+    if (it != cache.end()) return it->second;
+    if (cache.size() > 400) cache.clear();
+    Img &im = cache[key];
+    wxMemoryDC mdc;
+    mdc.SetFont(OverlayFont());
+    const wxSize sz = mdc.GetTextExtent(t);
+    if (sz.x <= 0 || sz.y <= 0) return im;
+    wxBitmap bmp(sz.x, sz.y, 24);
+    mdc.SelectObject(bmp);
+    mdc.SetBackground(*wxWHITE_BRUSH);
+    mdc.Clear();
+    mdc.SetTextForeground(*wxBLACK);
+    mdc.DrawText(t, 0, 0);
+    mdc.SelectObject(wxNullBitmap);
+    const wxImage img = bmp.ConvertToImage();
+    im.w = sz.x;
+    im.h = sz.y;
+    im.rgba.resize((size_t)im.w * im.h * 4);
+    const unsigned char *src = img.GetData();
+    for (int i = 0; i < im.w * im.h; i++) {
+      im.rgba[i * 4 + 0] = c.Red();
+      im.rgba[i * 4 + 1] = c.Green();
+      im.rgba[i * 4 + 2] = c.Blue();
+      im.rgba[i * 4 + 3] = (unsigned char)(255 - src[i * 3]);  // coverage
+    }
+    return im;
+  }
+};
+
+// one Annex C symbol at screen position c, rotated clockwise by rot
+static void DrawSymbol(S411Painter &p, const S411Symbol *sym, wxPoint c,
+                       double ppmm, double rot, S411Palette pal) {
+  if (!sym) return;
+  const wxColour col = LineColour(sym->token, pal);
+  const double cs = std::cos(rot), sn = std::sin(rot);
+  std::vector<wxRealPoint> pts;
+  for (int i = 0; i < sym->count; i++) {
+    const S411SymPrim &pr = sym->prims[i];
+    pts.clear();
+    for (int k = 0; k < pr.n; k++) {
+      const double x = pr.xy[2 * k] * ppmm, y = pr.xy[2 * k + 1] * ppmm;
+      pts.push_back(wxRealPoint(c.x + x * cs - y * sn, c.y + x * sn + y * cs));
+    }
+    if (pr.filled)
+      p.Fill(pts, col);
+    else
+      p.Lines(pts, col, pr.width * ppmm);
+  }
+}
+
+// ICEBRGA1: iceberg symbols on a lattice v1 = (16, 0) mm, v2 = (8, 16) mm,
+// anchored to the area (GlobalGeometry), drawn where the lattice point lies
+// inside the area
+static void DrawBergPattern(S411Painter &p, PlugIn_ViewPort *vp,
+                            const S411Feature &f, double k, double ppmm,
+                            S411Palette pal) {
+  const S411Symbol *sym = S411FindSymbol("ICEBRG99");
+  const wxPoint o = Pix(vp, f.latMax, f.lonMin - k);
+  int x0 = INT_MAX, x1 = INT_MIN, y0 = INT_MAX, y1 = INT_MIN;
+  for (double la : {f.latMin, f.latMax})
+    for (double lo : {f.lonMin, f.lonMax, (f.lonMin + f.lonMax) / 2}) {
+      const wxPoint q = Pix(vp, la, lo - k);
+      x0 = std::min(x0, q.x); x1 = std::max(x1, q.x);
+      y0 = std::min(y0, q.y); y1 = std::max(y1, q.y);
+    }
+  x0 = std::max(x0, 0); y0 = std::max(y0, 0);
+  x1 = std::min(x1, vp->pix_width); y1 = std::min(y1, vp->pix_height);
+  if (x0 >= x1 || y0 >= y1) return;
+  const double s = 16.0 * ppmm;
+  int drawn = 0;
+  for (int j = (int)std::floor((y0 - o.y) / s); j * s + o.y <= y1 + s; j++) {
+    const double rowX = o.x + j * 8.0 * ppmm;
+    for (int i = (int)std::floor((x0 - rowX) / s); i * s + rowX <= x1 + s;
+         i++) {
+      const wxPoint q(wxRound(rowX + i * s), wxRound(o.y + j * s));
+      if (q.x < x0 || q.x > x1 || q.y < y0 || q.y > y1) continue;
+      double lat, lon;
+      GetCanvasLLPix(vp, q, &lat, &lon);
+      if (!S411AreaContains(f, lat, lon)) continue;
+      DrawSymbol(p, sym, q, ppmm, 0, pal);
+      if (++drawn > 800) return;  // guard against absurd zoom levels
+    }
+  }
+}
+
+void s411_pi::RenderOverlays(S411Painter &p, PlugIn_ViewPort *vp) {
+  const double ppmm = PxPerMm();
+  std::vector<double> ks;
+  const wxColour lin = LineColour("ICELIN", m_palette);
+
+  // point symbols (Annex C), PS 9.7 value text, iceberg area pattern
+  for (size_t di : DrawOrder()) {
+    for (const auto &f : m_data[di].features) {
+      if (f.superseded || LatCulled(f, vp)) continue;
+      const bool berg = f.kind == S411Kind::Area && f.type == "IcebergArea";
+      if (f.kind != S411Kind::Point && !berg) continue;
+      WorldShifts(f.lonMin, f.lonMax, vp, ks);
+      for (double k : ks) {
+        if (berg) {
+          DrawBergPattern(p, vp, f, k, ppmm, m_palette);
+          continue;
+        }
+        const S411Pos &pos = f.rings[0][0];
+        const wxPoint c = Pix(vp, pos.lat, pos.lon - k);
+        if (c.x < -60 || c.y < -60 || c.x > vp->pix_width + 60 ||
+            c.y > vp->pix_height + 60)
+          continue;
+        double rot = 0;
+        if (f.symbol.StartsWith("ICEDFT")) {  // true direction: follow north
+          const wxPoint n = Pix(vp, pos.lat + 0.01, pos.lon - k);
+          rot = std::atan2((double)(n.x - c.x), (double)(c.y - n.y));
+        }
+        const S411Symbol *sym = S411FindSymbol(f.symbol.mb_str());
+        if (sym) {
+          DrawSymbol(p, sym, c, ppmm, rot, m_palette);
+        } else {  // point type without an Annex C symbol: small marker
+          p.Fill({wxRealPoint(c.x, c.y - 6), wxRealPoint(c.x - 5, c.y + 4),
+                  wxRealPoint(c.x + 5, c.y + 4)},
+                 lin);
+        }
+        if (m_showValues && !f.valueText.IsEmpty()) {
+          const wxSize e = p.Extent(f.valueText);
+          p.Text(f.valueText, c.x + wxRound(4 * ppmm), c.y - e.y / 2, lin);
+        }
+      }
+    }
+  }
+
+  // markers of the last route ice check (PS 9.6)
+  for (const auto &a : m_routeAlerts) {
+    const wxColour col = a.alert == S411Alert::IceHazard ? wxColour(220, 0, 0)
+                       : a.alert == S411Alert::IceDifficult
+                           ? wxColour(255, 140, 0)
+                           : wxColour(200, 0, 200);
+    const wxPoint c = Pix(vp, a.where.lat,
+                          a.where.lon - WorldShift(a.where.lon, vp->clon));
+    std::vector<wxRealPoint> ring;
+    const double r = 3.5 * ppmm;
+    for (int i = 0; i <= 24; i++)
+      ring.push_back(wxRealPoint(c.x + r * std::cos(i * 3.14159265358979323846 / 12),
+                                 c.y + r * std::sin(i * 3.14159265358979323846 / 12)));
+    p.Lines(ring, col, 3);
+    p.Text(wxString::Format("leg %zu", a.leg + 1), c.x + wxRound(r) + 3,
+           c.y - wxRound(r), col);
+  }
+
+  // age of the displayed ice information (PS 8.1: always visible)
+  if (!m_showAgeBox) return;
+  const time_t now = time(nullptr);
+  const bool dark = m_palette != S411Palette::Day;
+  const wxColour fg = dark ? wxColour(230, 230, 230) : wxColour(20, 20, 20);
+  const wxColour warn = dark ? wxColour(255, 110, 110) : wxColour(200, 0, 0);
+  std::vector<std::pair<wxString, wxColour>> lines;
+  std::vector<size_t> order = DrawOrder();
+  std::reverse(order.begin(), order.end());  // most recent first
+  for (size_t n = 0; n < order.size(); n++) {
+    if (n == 4) {
+      lines.push_back({wxString::Format("... and %zu more dataset(s)",
+                                        order.size() - 4),
+                       fg});
+      break;
+    }
+    const S411Dataset &ds = m_data[order[n]];
+    wxString l = (ds.producer.IsEmpty() ? ds.title : ds.producer) + ": " +
+                 S411AgeText(ds, now);
+    const S411Age age = S411DatasetAge(ds, now, m_ageLimitH);
+    bool bad = true;
+    if (age == S411Age::Outdated) l += "  - ICE INFORMATION OUTDATED";
+    else if (age == S411Age::Expired) l += "  - older than 30 days";
+    else if (age == S411Age::OverLimit)
+      l += wxString::Format("  - older than the %g h age limit", m_ageLimitH);
+    else bad = age == S411Age::Unknown;
+    lines.push_back({l, bad ? warn : fg});
+  }
+  const wxString ov = S411OverlappingProducers(m_data);
+  if (!ov.IsEmpty())
+    lines.push_back({"Ice data of several producers overlap: " + ov, warn});
+  if (lines.empty()) return;
+  int w = 0, h = 0;
+  for (const auto &l : lines) {
+    const wxSize e = p.Extent(l.first);
+    w = std::max(w, e.x);
+    h = std::max(h, e.y);
+  }
+  const int pad = 5, x = 8, y = 8;
+  p.Box(wxRect(x, y, w + 2 * pad, (int)lines.size() * (h + 2) + 2 * pad - 2),
+        dark ? wxColour(20, 20, 30, 190) : wxColour(255, 255, 255, 200));
+  for (size_t i = 0; i < lines.size(); i++)
+    p.Text(lines[i].first, x + pad, y + pad + (int)i * (h + 2),
+           lines[i].second);
+}
+
 // ---------------------------------------------------------------------------
 // wxDC rendering (non-OpenGL mode); wxGraphicsContext for alpha fills
 // ---------------------------------------------------------------------------
 bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
   if (!m_show || m_data.empty()) return false;
   std::vector<wxPoint> pix;
+  std::vector<std::vector<wxPoint>> strips;
+  std::vector<double> ks;
 
 #if wxUSE_GRAPHICS_CONTEXT
   wxGraphicsContext *gc = nullptr;
@@ -1168,70 +2035,79 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
   if (mdc) gc = wxGraphicsContext::Create(*mdc);
 #endif
 
-  for (const auto &ds : m_data) {
-    if (!ds.visible) continue;
-    for (int pass = 0; pass < 3; pass++) {
+  for (size_t di : DrawOrder()) {
+    const S411Dataset &ds = m_data[di];
+    for (int pass = 0; pass < 2; pass++) {  // areas, then lines
       for (const auto &f : ds.features) {
-        if ((int)f.kind != (pass == 0 ? (int)S411Kind::Area
-                          : pass == 1 ? (int)S411Kind::Line
-                                      : (int)S411Kind::Point))
+        if ((pass == 0) != (f.kind == S411Kind::Area)) continue;
+        if (f.kind == S411Kind::Point || f.superseded || LatCulled(f, vp))
           continue;
-        if (Culled(f, vp)) continue;
-
-        if (f.kind == S411Kind::Area) {
-          bool berg = f.type == "IcebergArea";
+        WorldShifts(f.lonMin, f.lonMax, vp, ks);
+        for (double k : ks) {
+          if (f.kind == S411Kind::Line) {
+            Strips(vp, f.rings[0], k, false, strips);
+            S411LineStyle ls;
+            S411LineStyleFor(f.type, ls);
+            dc.SetPen(wxPen(LineColour(ls.token, m_palette),
+                            wxMax(1, (int)std::lround(ls.width)),
+                            DashToPen(ls.dash)));
+            for (const auto &s : strips) dc.DrawLines((int)s.size(), s.data());
+            continue;
+          }
+          const bool berg = f.type == "IcebergArea";  // pattern, no fill
           wxColour fill = s411_pi_AreaColour(f, m_mode, m_iceClass, m_palette);
 #if wxUSE_GRAPHICS_CONTEXT
           if (gc) {
-            wxGraphicsPath path = gc->CreatePath();
-            for (const auto &ring : f.rings) {
-              RingToPix(vp, ring, pix);
-              if (pix.size() < 3) continue;
-              path.MoveToPoint(pix[0].x, pix[0].y);
-              for (size_t i = 1; i < pix.size(); i++)
-                path.AddLineToPoint(pix[i].x, pix[i].y);
-              path.CloseSubpath();
+            if (!berg) {
+              wxGraphicsPath path = gc->CreatePath();
+              for (const auto &ring : f.rings) {
+                RingPoly(vp, ring, k, pix);
+                if (pix.size() < 3) continue;
+                path.MoveToPoint(pix[0].x, pix[0].y);
+                for (size_t i = 1; i < pix.size(); i++)
+                  path.AddLineToPoint(pix[i].x, pix[i].y);
+                path.CloseSubpath();
+              }
+              gc->SetBrush(wxBrush(
+                  wxColour(fill.Red(), fill.Green(), fill.Blue(), m_alpha)));
+              gc->FillPath(path, wxODDEVEN_RULE);
             }
-            gc->SetBrush(wxBrush(berg
-                ? wxColour(0, 0, 0, wxMin(60, m_alpha))
-                : wxColour(fill.Red(), fill.Green(), fill.Blue(), m_alpha)));
-            gc->FillPath(path, wxODDEVEN_RULE);
-            gc->SetPen(wxPen(wxColour(0, 0, 0, 120), 1));
-            gc->StrokePath(path);
+            wxGraphicsPath outline = gc->CreatePath();
+            for (const auto &ring : f.rings) {
+              Strips(vp, ring, k, true, strips);
+              for (const auto &s : strips) {
+                outline.MoveToPoint(s[0].x, s[0].y);
+                for (size_t i = 1; i < s.size(); i++)
+                  outline.AddLineToPoint(s[i].x, s[i].y);
+              }
+            }
+            gc->SetPen(berg ? wxPen(LineColour("ICEBRG", m_palette), 1)
+                            : wxPen(wxColour(0, 0, 0, 120), 1));
+            gc->StrokePath(outline);
             continue;
           }
 #endif
-          // plain-DC fallback (print/PDF): draw all rings with even-odd so
-          // holes and secondary exteriors match the GC/GL paths
+          // plain-DC fallback (print/PDF): all rings with even-odd so holes
+          // and secondary exteriors match the GC/GL paths
           std::vector<wxPoint> allPts;
           std::vector<int> counts;
           for (const auto &ring : f.rings) {
-            RingToPix(vp, ring, pix);
+            RingPoly(vp, ring, k, pix);
             if (pix.size() < 3) continue;
             counts.push_back((int)pix.size());
             allPts.insert(allPts.end(), pix.begin(), pix.end());
           }
-          if (counts.empty()) continue;
-          dc.SetBrush(wxBrush(berg ? wxColour(200, 200, 200) : fill));
+          if (!berg && !counts.empty()) {
+            dc.SetBrush(wxBrush(fill));
+            dc.SetPen(*wxTRANSPARENT_PEN);
+            dc.DrawPolyPolygon((int)counts.size(), counts.data(),
+                               allPts.data(), 0, 0, wxODDEVEN_RULE);
+          }
           dc.SetPen(wxPen(*wxBLACK, 1));
-          dc.DrawPolyPolygon((int)counts.size(), counts.data(),
-                             allPts.data(), 0, 0, wxODDEVEN_RULE);
-        } else if (f.kind == S411Kind::Line) {
-          RingToPix(vp, f.rings[0], pix);
-          if (pix.size() < 2) continue;
-          S411LineStyle ls;
-          S411LineStyleFor(f.type, ls);
-          dc.SetPen(wxPen(LineColour(ls.token, m_palette),
-                          wxMax(1, (int)std::lround(ls.width)),
-                          DashToPen(ls.dash)));
-          dc.DrawLines((int)pix.size(), pix.data());
-        } else {
-          wxPoint p = PointToPix(vp, f.rings[0][0]);
-          dc.SetBrush(wxBrush(LineColour("ICELIN", m_palette)));
-          dc.SetPen(wxPen(*wxWHITE, 1));
-          wxPoint tri[3] = {wxPoint(p.x, p.y - 6), wxPoint(p.x - 5, p.y + 4),
-                            wxPoint(p.x + 5, p.y + 4)};
-          dc.DrawPolygon(3, tri);
+          for (const auto &ring : f.rings) {
+            Strips(vp, ring, k, true, strips);
+            for (const auto &s : strips) dc.DrawLines((int)s.size(), s.data());
+          }
         }
       }
     }
@@ -1239,58 +2115,141 @@ bool s411_pi::RenderDC(wxDC &dc, PlugIn_ViewPort *vp) {
 #if wxUSE_GRAPHICS_CONTEXT
   delete gc;
 #endif
+  S411DCPainter painter(dc);
+  RenderOverlays(painter, vp);
   return true;
 }
 
 // ---------------------------------------------------------------------------
 // OpenGL rendering: areas were triangulated at load time (S411Tess)
 // ---------------------------------------------------------------------------
+// In Mercator the projection is affine in (lon, Mercator northing), so the
+// pre-built float Mercator copies are drawn straight from vertex arrays with
+// one matrix per feature - no per-vertex projection call per frame. The
+// matrix is measured from OpenCPN's own projection each frame and checked
+// against it at two more points; any mismatch, another projection, or a
+// zoom where float precision would show falls back to the exact path.
+struct S411Affine {
+  double a, b, c, d, tx, ty;  // px = a*x + b*y + tx, py = c*x + d*y + ty
+};
+
+static bool MercatorAffine(PlugIn_ViewPort *vp, S411Affine &m) {
+  if (vp->m_projection_type != PI_PROJECTION_MERCATOR) return false;
+  const double lat0 = std::max(-80.0, std::min(80.0, vp->clat));
+  const double lon0 = vp->clon;
+  const double dLon = std::max(1e-4, std::fabs(vp->lon_max - vp->lon_min) / 4);
+  double dLat = std::max(1e-4, std::fabs(vp->lat_max - vp->lat_min) / 4);
+  const double lat1 = lat0 + (lat0 > 0 ? -dLat : dLat);
+  wxPoint2DDouble p0, p1, p2;
+  GetDoubleCanvasPixLL(vp, &p0, lat0, lon0);
+  GetDoubleCanvasPixLL(vp, &p1, lat0, lon0 + dLon);
+  GetDoubleCanvasPixLL(vp, &p2, lat1, lon0);
+  const double y0 = S411MercY(lat0), y1 = S411MercY(lat1);
+  if (std::fabs(y1 - y0) < 1e-9) return false;
+  m.a = (p1.m_x - p0.m_x) / dLon;
+  m.c = (p1.m_y - p0.m_y) / dLon;
+  m.b = (p2.m_x - p0.m_x) / (y1 - y0);
+  m.d = (p2.m_y - p0.m_y) / (y1 - y0);
+  m.tx = p0.m_x - m.a * lon0 - m.b * y0;
+  m.ty = p0.m_y - m.c * lon0 - m.d * y0;
+  // float vertex pipeline: keep the rounding error well below a pixel
+  if (std::hypot(m.a, m.c) > 2.0e4) return false;
+  for (double f : {0.1, 0.9}) {
+    const double la = vp->lat_min + f * (vp->lat_max - vp->lat_min);
+    const double lo = vp->lon_min + (1 - f) * (vp->lon_max - vp->lon_min);
+    wxPoint2DDouble q;
+    GetDoubleCanvasPixLL(vp, &q, la, lo);
+    const double y = S411MercY(la);
+    const double ex = m.a * lo + m.b * y + m.tx - q.m_x;
+    const double ey = m.c * lo + m.d * y + m.ty - q.m_y;
+    if (std::hypot(ex, ey) > 0.75) return false;
+  }
+  return true;
+}
+
+// modelview for one feature: its local float coordinates -> canvas pixels
+static void LoadFeatureMatrix(const S411Affine &m, const S411Feature &f,
+                              double k) {
+  const double ox = f.mx0 - k, oy = f.my0;
+  const GLdouble mat[16] = {m.a, m.c, 0, 0, m.b, m.d, 0, 0, 0, 0, 1, 0,
+                            m.a * ox + m.b * oy + m.tx,
+                            m.c * ox + m.d * oy + m.ty, 0, 1};
+  glPushMatrix();
+  glMultMatrixd(mat);
+}
+
 bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
   if (!m_show || m_data.empty()) return false;
-  std::vector<wxPoint> pix;
+  std::vector<std::vector<wxPoint>> strips;
+  std::vector<double> ks;
 
   glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_ENABLE_BIT |
-               GL_POLYGON_BIT);
+               GL_POLYGON_BIT | GL_PIXEL_MODE_BIT | GL_CURRENT_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glDisable(GL_TEXTURE_2D);
 
-  for (const auto &ds : m_data) {
-    if (!ds.visible) continue;
+  S411Affine aff;
+  const bool fast = MercatorAffine(vp, aff);
+  GLint matrixMode = GL_MODELVIEW;
+  glGetIntegerv(GL_MATRIX_MODE, &matrixMode);
+  glMatrixMode(GL_MODELVIEW);
+  if (fast) glEnableClientState(GL_VERTEX_ARRAY);
+
+  for (size_t di : DrawOrder()) {
+    const S411Dataset &ds = m_data[di];
     for (const auto &f : ds.features) {
-      if (f.kind != S411Kind::Area || f.tris.empty() || Culled(f, vp))
+      if (f.kind != S411Kind::Area || f.superseded || LatCulled(f, vp))
         continue;
-      bool berg = f.type == "IcebergArea";
-      wxColour fill = s411_pi_AreaColour(f, m_mode, m_iceClass, m_palette);
-      if (berg) glColor4ub(0, 0, 0, (GLubyte)wxMin(60, m_alpha));
-      else glColor4ub(fill.Red(), fill.Green(), fill.Blue(), (GLubyte)m_alpha);
-
-      const double k = WorldShift((f.lonMin + f.lonMax) / 2.0, vp->clon);
-      glBegin(GL_TRIANGLES);
-      for (const auto &t : f.tris) {
-        wxPoint p;
-        GetCanvasPixLL(vp, &p, t.lat, t.lon - k);
-        glVertex2i(p.x, p.y);
-      }
-      glEnd();
-
-      glColor4ub(0, 0, 0, 120);   // outline
-      glLineWidth(1.0f);
-      for (const auto &ring : f.rings) {
-        RingToPix(vp, ring, pix);
-        if (pix.size() < 3) continue;
-        glBegin(GL_LINE_LOOP);
-        for (const auto &p : pix) glVertex2i(p.x, p.y);
-        glEnd();
+      const bool berg = f.type == "IcebergArea";  // pattern, no fill
+      const wxColour fill =
+          s411_pi_AreaColour(f, m_mode, m_iceClass, m_palette);
+      const wxColour edge = berg ? LineColour("ICEBRG", m_palette)
+                                 : wxColour(0, 0, 0, 120);
+      WorldShifts(f.lonMin, f.lonMax, vp, ks);
+      for (double k : ks) {
+        glLineWidth(1.0f);
+        if (fast) {
+          LoadFeatureMatrix(aff, f, k);
+          if (!berg && !f.mTris.empty()) {
+            glColor4ub(fill.Red(), fill.Green(), fill.Blue(), (GLubyte)m_alpha);
+            glVertexPointer(2, GL_FLOAT, 0, f.mTris.data());
+            glDrawArrays(GL_TRIANGLES, 0, (GLsizei)(f.mTris.size() / 2));
+          }
+          glColor4ub(edge.Red(), edge.Green(), edge.Blue(), edge.Alpha());
+          for (const auto &s : f.mStrips) {
+            glVertexPointer(2, GL_FLOAT, 0, s.data());
+            glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)(s.size() / 2));
+          }
+          glPopMatrix();
+          continue;
+        }
+        if (!berg) {
+          glColor4ub(fill.Red(), fill.Green(), fill.Blue(), (GLubyte)m_alpha);
+          glBegin(GL_TRIANGLES);
+          for (const auto &t : f.tris) {
+            const wxPoint p = Pix(vp, t.lat, t.lon - k);
+            glVertex2i(p.x, p.y);
+          }
+          glEnd();
+        }
+        glColor4ub(edge.Red(), edge.Green(), edge.Blue(), edge.Alpha());
+        for (const auto &ring : f.rings) {
+          Strips(vp, ring, k, true, strips);
+          for (const auto &s : strips) {
+            glBegin(GL_LINE_STRIP);
+            for (const auto &p : s) glVertex2i(p.x, p.y);
+            glEnd();
+          }
+        }
       }
     }
     for (const auto &f : ds.features) {
-      if (f.kind != S411Kind::Line || Culled(f, vp)) continue;
-      RingToPix(vp, f.rings[0], pix);
-      if (pix.size() < 2) continue;
+      if (f.kind != S411Kind::Line || f.superseded || LatCulled(f, vp))
+        continue;
       S411LineStyle ls;
       S411LineStyleFor(f.type, ls);
-      wxColour lc = LineColour(ls.token, m_palette);
+      const wxColour lc = LineColour(ls.token, m_palette);
       glColor4ub(lc.Red(), lc.Green(), lc.Blue(), 255);
       glLineWidth((GLfloat)ls.width);
       if (ls.stipple) {
@@ -1299,23 +2258,32 @@ bool s411_pi::RenderGL(PlugIn_ViewPort *vp) {
       } else {
         glDisable(GL_LINE_STIPPLE);
       }
-      glBegin(GL_LINE_STRIP);
-      for (const auto &p : pix) glVertex2i(p.x, p.y);
-      glEnd();
+      WorldShifts(f.lonMin, f.lonMax, vp, ks);
+      for (double k : ks) {
+        if (fast) {
+          LoadFeatureMatrix(aff, f, k);
+          for (const auto &s : f.mStrips) {
+            glVertexPointer(2, GL_FLOAT, 0, s.data());
+            glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)(s.size() / 2));
+          }
+          glPopMatrix();
+          continue;
+        }
+        Strips(vp, f.rings[0], k, false, strips);
+        for (const auto &s : strips) {
+          glBegin(GL_LINE_STRIP);
+          for (const auto &p : s) glVertex2i(p.x, p.y);
+          glEnd();
+        }
+      }
     }
     glDisable(GL_LINE_STIPPLE);
-    wxColour pc = LineColour("ICELIN", m_palette);
-    for (const auto &f : ds.features) {
-      if (f.kind != S411Kind::Point || Culled(f, vp)) continue;
-      wxPoint p = PointToPix(vp, f.rings[0][0]);
-      glColor4ub(pc.Red(), pc.Green(), pc.Blue(), 255);
-      glBegin(GL_TRIANGLES);
-      glVertex2i(p.x, p.y - 6);
-      glVertex2i(p.x - 5, p.y + 4);
-      glVertex2i(p.x + 5, p.y + 4);
-      glEnd();
-    }
   }
+  if (fast) glDisableClientState(GL_VERTEX_ARRAY);
+  glMatrixMode(matrixMode);
+
+  S411GLPainter painter;
+  RenderOverlays(painter, vp);
   glPopAttrib();
   return true;
 }

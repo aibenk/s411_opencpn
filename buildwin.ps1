@@ -4,21 +4,32 @@
 # The script downloads the matching wxWidgets 3.2.9 vc14x SDK on first run
 # and generates the OpenCPN import library from the installed opencpn.exe.
 #
-#   powershell -ExecutionPolicy Bypass -File buildwin.ps1 [-Install] [-Package]
+#   powershell -ExecutionPolicy Bypass -File buildwin.ps1 [-Install] [-Package] [-Test]
 #
 #   -Install  copy the DLL into the OpenCPN program plugins folder (UAC)
 #   -Package  build dist\s411_pi-<ver>-msvc-wx32-win32.tar.gz for
 #             OpenCPN's Options -> Plugins -> "Import plugin..." (preferred)
+#   -Test     also build the headless test binary and run it against
+#             tests\fixtures (wx base + xml only, no OpenCPN needed)
+#   -TestOnly only the test binary (no OpenCPN needed - used by CI)
 
-param([switch]$Install, [switch]$Package)
-$Version = "0.7.0"
+param([switch]$Install, [switch]$Package, [switch]$Test, [switch]$TestOnly)
 $ErrorActionPreference = "Stop"
 $repo = $PSScriptRoot
 $sdk = "$repo\sdk"
 $ocpnDir = "C:\Program Files (x86)\OpenCPN"
-$vc = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
-if (-not (Test-Path $vc)) { throw "vcvars32.bat not found - install VS2022 with C++ workload" }
-if (-not (Test-Path "$ocpnDir\opencpn.exe")) { throw "OpenCPN not found in $ocpnDir" }
+# any VS 2022 edition (Community locally, Enterprise on GitHub runners)
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vsDir = if (Test-Path $vswhere) { & $vswhere -latest -products * -property installationPath } else { "" }
+$vc = "$vsDir\VC\Auxiliary\Build\vcvars32.bat"
+if (-not $vsDir -or -not (Test-Path $vc)) { throw "vcvars32.bat not found - install VS2022 with C++ workload" }
+if ($TestOnly) { $Test = $true }
+elseif (-not (Test-Path "$ocpnDir\opencpn.exe")) { throw "OpenCPN not found in $ocpnDir" }
+
+$sources = "src\S411Data.cpp src\S411Tess.cpp src\S411Router.cpp src\S411Boundary.cpp src\S411Catalog.cpp src\S411Sigrid.cpp"
+# _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR: OpenCPN ships msvcp140.dll 14.12 (VS 2017);
+# VS 2022's constexpr std::mutex crashes in that runtime
+$cflags = "/nologo /std:c++14 /EHsc /MD /O2 /DWIN32 /D_WINDOWS /D__WXMSW__ /DWXUSINGDLL /D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR /D_UNICODE /DUNICODE /Isdk\wx\include /Isdk\wx\lib\vc14x_dll\mswu /Iapi /Isrc"
 
 # 1. wxWidgets 3.2.9 SDK (headers + Win32 vc14x import libs, ~35 MB once)
 if (-not (Test-Path "$sdk\wx\lib\vc14x_dll")) {
@@ -30,22 +41,36 @@ if (-not (Test-Path "$sdk\wx\lib\vc14x_dll")) {
     tar -xf "$sdk\dev.7z" -C "$sdk\wx"
 }
 
-# 2. OpenCPN import library from the installed exe's export table
-if (-not (Test-Path "$sdk\opencpn.lib")) {
-    cmd /c "`"$vc`" >nul 2>&1 && dumpbin /exports `"$ocpnDir\opencpn.exe`" > `"$sdk\exports.txt`""
-    $names = Get-Content "$sdk\exports.txt" |
-        Where-Object { $_ -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]{8}\s+(\S+)" } |
-        ForEach-Object { $Matches[1] }
-    if ($names.Count -lt 100) { throw "unexpectedly few exports - wrong opencpn.exe?" }
-    Set-Content "$sdk\opencpn.def" (@("LIBRARY opencpn.exe", "EXPORTS") + $names) -Encoding ascii
-    cmd /c "`"$vc`" >nul 2>&1 && lib /nologo /def:`"$sdk\opencpn.def`" /machine:x86 /out:`"$sdk\opencpn.lib`""
+if (-not $TestOnly) {
+    # 2. OpenCPN import library from the installed exe's export table
+    if (-not (Test-Path "$sdk\opencpn.lib")) {
+        cmd /c "`"$vc`" >nul 2>&1 && dumpbin /exports `"$ocpnDir\opencpn.exe`" > `"$sdk\exports.txt`""
+        $names = Get-Content "$sdk\exports.txt" |
+            Where-Object { $_ -match "^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]{8}\s+(\S+)" } |
+            ForEach-Object { $Matches[1] }
+        if ($names.Count -lt 100) { throw "unexpectedly few exports - wrong opencpn.exe?" }
+        Set-Content "$sdk\opencpn.def" (@("LIBRARY opencpn.exe", "EXPORTS") + $names) -Encoding ascii
+        cmd /c "`"$vc`" >nul 2>&1 && lib /nologo /def:`"$sdk\opencpn.def`" /machine:x86 /out:`"$sdk\opencpn.lib`""
+    }
+
+    # 3. compile + link (Win32, /MD, wx DLL build - matches OpenCPN's vc14x DLLs)
+    New-Item -ItemType Directory -Force "$repo\winbuild" | Out-Null
+    $objs = (("s411_pi " + ($sources -replace "src\\(\w+)\.cpp", '$1')) -split " " | ForEach-Object { "winbuild\$_.obj" }) -join " "
+    cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /c $cflags /Fowinbuild\ src\s411_pi.cpp $sources && link /nologo /DLL /MACHINE:X86 /OUT:winbuild\s411_pi.dll $objs /LIBPATH:sdk\wx\lib\vc14x_dll sdk\opencpn.lib wxmsw32u_core.lib wxbase32u.lib wxbase32u_xml.lib wxmsw32u_gl.lib wxmsw32u_aui.lib wxmsw32u_adv.lib glu32.lib opengl32.lib comctl32.lib rpcrt4.lib bcrypt.lib crypt32.lib"
+    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+    Write-Host "OK: winbuild\s411_pi.dll"
 }
 
-# 3. compile + link (Win32, /MD, wx DLL build - matches OpenCPN's vc14x DLLs)
-New-Item -ItemType Directory -Force "$repo\winbuild" | Out-Null
-cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl /nologo /c /std:c++14 /EHsc /MD /O2 /DWIN32 /D_WINDOWS /D__WXMSW__ /DWXUSINGDLL /D_UNICODE /DUNICODE /Isdk\wx\include /Isdk\wx\lib\vc14x_dll\mswu /Iapi /Isrc /Fowinbuild\ src\s411_pi.cpp src\S411Data.cpp src\S411Tess.cpp src\S411Router.cpp src\S411Boundary.cpp && link /nologo /DLL /MACHINE:X86 /OUT:winbuild\s411_pi.dll winbuild\s411_pi.obj winbuild\S411Data.obj winbuild\S411Tess.obj winbuild\S411Router.obj winbuild\S411Boundary.obj /LIBPATH:sdk\wx\lib\vc14x_dll sdk\opencpn.lib wxmsw32u_core.lib wxbase32u.lib wxbase32u_xml.lib wxmsw32u_gl.lib wxmsw32u_aui.lib wxmsw32u_adv.lib glu32.lib opengl32.lib comctl32.lib rpcrt4.lib"
-if ($LASTEXITCODE -ne 0) { throw "build failed" }
-Write-Host "OK: winbuild\s411_pi.dll"
+# 3b. optional: headless test binary (console subsystem, wx base + xml)
+if ($Test) {
+    New-Item -ItemType Directory -Force "$repo\winbuild\test" | Out-Null
+    cmd /c "`"$vc`" >nul 2>&1 && cd /d `"$repo`" && cl $cflags /Fowinbuild\test\ /Fewinbuild\test\s411_test.exe tests\test_main.cpp $sources /link /LIBPATH:sdk\wx\lib\vc14x_dll wxbase32u.lib wxbase32u_xml.lib glu32.lib opengl32.lib bcrypt.lib crypt32.lib"
+    if ($LASTEXITCODE -ne 0) { throw "test build failed" }
+    # the wx DLLs live next to the import libs; OpenCPN's copies are the same
+    $env:PATH = "$sdk\wx\lib\vc14x_dll;$env:PATH"
+    & "$repo\winbuild\test\s411_test.exe" "$repo\tests\fixtures"
+    if ($LASTEXITCODE -ne 0) { throw "tests failed" }
+}
 
 # 4. optional: import tarball for the OpenCPN plugin manager.
 # Metadata comes from the committed packaging/metadata.xml and the tarball is

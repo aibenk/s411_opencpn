@@ -1,6 +1,6 @@
 <plugin version="1">
   <name>s411_pi</name>
-  <version>0.7.0</version>
+  <version>0.8.0</version>
   <release>1</release>
   <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
   <api-version>1.16</api-version>
@@ -10,11 +10,14 @@
   <description>Loads S-411 Ice Information datasets (Edition 2.0.0/1.x GML,
 exchange sets, zips) and renders them with the WMO ice chart colour code.
 Switchable display mode (concentration / stage of development / ice-class
-traffic light), vessel ice class and day/dusk/night palette. Computes
-ice-aware routes (A* by vessel ice class) and exports ice no-go zones as
-ocpn_draw boundaries for the Weather Routing plugin.</description>
+traffic light), vessel ice class and day/dusk/night palette, Annex C
+symbols. Shows the age of the ice information, applies the dataset
+precedence rules and verifies S-100 signatures. Checks routes for ice,
+computes ice-aware routes (A* by vessel ice class), exports ice no-go zones
+for the Weather Routing plugin and downloads the current charts of the ice
+services. Also reads SIGRID-3 shapefiles.</description>
   <target>msvc-wx32</target>
   <target-version>10</target-version>
   <target-arch>x86</target-arch>
-  <tarball-url>https://github.com/aibenk/s411_opencpn/releases</tarball-url>
+  <tarball-url>https://github.com/aibenk/s411_opencpn/releases/download/v0.8.0/s411_pi-0.8.0-msvc-wx32-win32.tar.gz</tarball-url>
 </plugin>

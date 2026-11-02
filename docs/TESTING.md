@@ -15,7 +15,7 @@ is testable headlessly — the same tests run on every push in GitHub CI.
 **Linux / WSL:**
 
 ```sh
-sudo apt install cmake g++ libwxgtk3.2-dev libglu1-mesa-dev
+sudo apt install cmake g++ libwxgtk3.2-dev libglu1-mesa-dev libssl-dev
 git clone https://github.com/aibenk/s411_opencpn
 cd s411_opencpn
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DS411_BUILD_TESTS=ON
@@ -23,16 +23,26 @@ cmake --build build --parallel
 ./build/s411_test tests/fixtures
 ```
 
-**Expected:** `ALL TESTS PASSED (0 failures)` — 53 checks against real data:
+**Expected:** `ALL TESTS PASSED (0 failures)` — 152 checks against real data:
 a BSH Baltic chart with 337 features, NWS Alaska across 180°, ice-report
 stations, an exchange set as a directory and as a zip, **axis detection**
 (lat/lon vs lon/lat, 0–360° longitudes, a CRS84 `srsName` for the ambiguous
 Baltic case), the hit test for feature picking, attribute capture, code labels
 and the traffic-light semantics (the same tables as the web viewer and the
-normative `rules/main.xsl` in the S-411 specification project).
+normative `rules/main.xsl` in the S-411 specification project). Since v0.8.0
+also: a **load-time budget** on the real NIC Arctic chart and on a synthetic
+polygon with 1600 holes, a **circumpolar ring**, EPSG:3031 and SIGRID-3
+input, **signature verification** (valid, tampered), precedence, forecasts,
+data age, the route ice check, and the **golden portrayal**: area colours,
+alerts, point symbols and value texts of four datasets × four settings must
+equal the specification's `Expected_Portrayal` display lists.
 
-**Windows without CMake:** `testbuild\s411_test.exe tests\fixtures` (kept in
-step by the build steps in this repo).
+Without OpenSSL (`libssl-dev`) the build still works; signatures are then
+reported as "not verified".
+
+**Windows:** `powershell -ExecutionPolicy Bypass -File buildwin.ps1 -TestOnly`
+(needs only Visual Studio; downloads the wx SDK on first run). CI runs the same
+on a Windows runner.
 
 ---
 
@@ -152,7 +162,7 @@ Then the functional checklist:
 | 3 | Button off → on again → *Cancel* in the dialog | overlay disappears / reappears without reloading |
 | 4 | Load `TDS4_RealData_Baltic.zip`, zoom/pan into the Baltic | smooth pan/zoom despite 337 features (triangulation happens only on load) |
 | 5 | Load `TDS8_...zip`, navigate to the **Bering Strait / Alaska** | ice areas sit correctly on both sides of the date line — **no** globe-spanning bands |
-| 6 | Load `TDS6_...zip`, German Baltic coast | black triangular markers at the station positions |
+| 6 | Load `TDS6_...zip`, German Baltic coast | report-station symbols (Annex C `REPSTA01`, a small sheet of paper) at the station positions; ice thickness symbols with "70 cm" text next to them |
 | 7 | Test an unpacked exchange set: unzip it, pick the **CATALOG.XML** in the dialog | same effect as loading the zip |
 | 8 | Pick a single `.GML` from `DATASET_FILES/` | loads as well |
 | 9 | **Edition 1.x**: load a BSH FTP winter zip directly | chart appears with correct colours (iceact→concentration, fast ice detected) |
@@ -199,9 +209,10 @@ v0.6.0 the search corridor is automatically widened (×2/×4) on "no route in th
 corridor", and recomputing **replaces** the previous ice route instead of
 stacking it.
 
-**Known limits (v0.6.0, not bugs):** point features are drawn as generic
-triangles rather than Annex C symbols, line dash patterns are approximations,
-and on a split screen the feature report uses the last-drawn canvas viewport.
+**Known limits (not bugs):** line dash patterns are approximations of the
+Annex C line styles; on a split screen the feature report uses the last-drawn
+canvas viewport; precedence (below) hides whole features of an older chart,
+it does not cut features that straddle the newer chart's coverage edge.
 The router searches a corridor around start/destination (no global routing
 across large ocean basins); start/destination above 85° are rejected. **10/10
 ice (and fast ice) is impassable for every ice class** — deliberately identical
@@ -209,12 +220,38 @@ to the traffic-light display; in deep winter "no route" can therefore be the
 correct answer. (A permeable mode for the highest ice classes with a heavy
 penalty would be a possible future option.)
 
+**v0.8.0 — loading, validity, symbols, route check:**
+
+| # | Test | Expected |
+|---|---|---|
+| 30 | Load the NIC Arctic extent zip (`tests/fixtures/S411_NATICE_ArcticExtent_*.zip`) | the panel shows a progress bar and "Loading 1 of 1"; OpenCPN stays usable while it loads (was frozen ~1 min); after ~2 s the chart jumps to the Arctic |
+| 31 | Pan the NIC chart across 180° and zoom out to the whole Arctic | the ice area is continuous around the pole and across the date line, no gap or wedge at the seam, no outline along a meridian |
+| 32 | Load an Antarctic chart (NIC/AARI from the Ice Portal) | ice areas round the South Pole are drawn (they were invisible before) |
+| 33 | Look at the top-left corner of the chart | a box "DE00: Ice analysis 1 Mar 2026 12:00 UTC - … days old" per displayed dataset; red when older than the age limit or outdated |
+| 34 | Load any test dataset from 2025/early 2026 | message "… outdated or older than 30 days … not displayed"; the list shows `[older than 30 days]`; ticking it shows the data, with the red age line |
+| 35 | Change **Age limit (hours)** | list flags and the chart box follow immediately |
+| 36 | Load `tests/fixtures/TDS1` (CATALOG.XML) | list entry ends "signed"; pick report shows `signature: signed - signer: S-411 TEST data server …(TEST PKI - not for navigation)` |
+| 37 | Copy TDS1, change one character in the GML, load the copy's CATALOG.XML | message "failed the digital signature check"; list says `SIGNATURE INVALID`; ticking it is refused with an explanation |
+| 38 | Load `tests/fixtures/prec_old.gml` and `prec_new.gml` | in the west half only the newer (yellow-green 3/10) area is drawn, the old red area there is hidden; the east half of the old chart stays; clicking there names the old dataset |
+| 39 | Load `tests/fixtures/forecast.gml` | loaded but unticked, list says `[forecast for …]`; ticking shows it |
+| 40 | Load two producers' charts that overlap (e.g. CIS + DMI East Greenland) | red note under the list and in the chart box "Data of several producers overlap: …" |
+| 41 | Load `tests/fixtures/circumpolar.gml`, zoom to 65°S 0°E | iceberg symbol (`ICEBRG03`), drift arrow pointing east with "0.5 kn", thickness symbol with "35 cm"; untick **Show ice values** removes the texts only |
+| 42 | Rotate the chart (course-up) with the circumpolar fixture | the drift arrow keeps pointing to true east; other symbols stay upright |
+| 43 | Iceberg area (TDS2 Greenland) | no grey fill; a pattern of iceberg symbols inside the area outline |
+| 44 | Make a route through ice in OpenCPN, activate it, **Check active route** | report per leg: `IceHazardForVessel` / `IceDifficultForVessel` / `Icebergs` with position, feature and dataset; coloured rings with "leg n" on the chart; **Clear marks** removes them |
+| 45 | **Current charts…** | list of the newest chart of every service on the BSH Ice Portal; pick a few → downloads with progress, then loads in the background |
+| 46 | Load the Argentine SHN chart from the Ice Portal (EPSG:3031, 52 MB) | loads in ~20 s in the background, ice sits around the Antarctic Peninsula |
+| 47 | Load a SIGRID-3 shapefile (`tests/fixtures/sigrid3_geo_*.shp` or `sigrid3_ant_*.zip`) | 9/10+ ice area with a hole near 64.5°S 60°W, a blue ice-free strip north of it, no land polygon |
+| 48 | Repeat 30, 31, 41 and 43 with OpenGL off | same picture in the non-GL path |
+| 49 | OpenGL on, zoom in to harbour scale on any chart | the overlay stays exactly on the chart (above ~1:20 000 the plugin switches from the fast vertex-array path to exact per-vertex projection) |
+| 50 | Load `tests/fixtures/nested.zip`, `circumpolar.gml.gz`, `TDS1.zip.gz` | zip in zip: the TDS1 exchange set (signed) plus the gzipped 1.x area in the Bothnian Bay; the two .gz files load like their unpacked versions |
+
 ---
 
 ## 4. Native Windows build (one command)
 
-Prerequisites: Visual Studio 2022 with the C++ workload, OpenCPN (Windows build,
-32-bit) installed. Then, in the repo:
+Prerequisites: Visual Studio 2022 (any edition) with the C++ workload,
+OpenCPN (Windows build, 32-bit) installed. Then, in the repo:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File buildwin.ps1 -Package
@@ -244,6 +281,13 @@ running): close OpenCPN and run
 `powershell -ExecutionPolicy Bypass -File packaging\uninstall.ps1` — it removes
 the DLL and the registration cleanly. **Before importing a new version**,
 uninstall the old one this way.
+
+**Updating an already imported plugin:** re-importing while OpenCPN runs
+fails (`opencpn.log`: *"archive write install header error: Can't unlink
+already-existing object"* — the running OpenCPN locks the DLL). Either close
+OpenCPN and run `powershell -ExecutionPolicy Bypass -File packaging\hotswap.ps1`
+(replaces the imported DLL in `%LOCALAPPDATA%\opencpn\plugins`, then start
+OpenCPN again), or uninstall, restart OpenCPN, then import the new tarball.
 
 Alternatively, `buildwin.ps1 -Install` copies the DLL straight to
 `C:\Program Files (x86)\OpenCPN\plugins\` (UAC) — but then **not both**: either

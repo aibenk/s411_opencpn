@@ -10,3 +10,4 @@ dist/
 .vscode/
 CMakeCache.txt
 CMakeFiles/
+testbuild/
