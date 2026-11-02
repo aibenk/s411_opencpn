@@ -24,6 +24,7 @@
 #include "S411Data.h"
 #include "S411Portrayal.h"
 #include "S411Router.h"
+#include "s411_version.h"
 
 class S411CtrlDialog;
 class S411LoadTimer;
@@ -31,7 +32,7 @@ class S411Worker;
 class S411EggPanel;
 struct S411Painter;
 
-class s411_pi : public opencpn_plugin_116 {
+class s411_pi : public opencpn_plugin_117 {
 public:
   explicit s411_pi(void *ppimgr);
 
@@ -39,9 +40,10 @@ public:
   int Init(void) override;
   bool DeInit(void) override;
   int GetAPIVersionMajor() override { return 1; }
-  int GetAPIVersionMinor() override { return 16; }
-  int GetPlugInVersionMajor() override { return 0; }
-  int GetPlugInVersionMinor() override { return 8; }
+  int GetAPIVersionMinor() override { return 17; }
+  int GetPlugInVersionMajor() override { return S411_VERSION_MAJOR; }
+  int GetPlugInVersionMinor() override { return S411_VERSION_MINOR; }
+  int GetPlugInVersionPatch() override { return S411_VERSION_PATCH; }
   wxBitmap *GetPlugInBitmap() override;
   wxString GetCommonName() override;
   wxString GetShortDescription() override;

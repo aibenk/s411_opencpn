@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
-project(s411_pi VERSION 0.8.1 LANGUAGES CXX)
+# the version lives in src/s411_version.h (single source)
+file(STRINGS src/s411_version.h S411_VERSION_LINE
+     REGEX "^#define S411_VERSION_STRING")
+string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" S411_VERSION "${S411_VERSION_LINE}")
+project(s411_pi VERSION ${S411_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

@@ -36,6 +36,14 @@ def main():
     if not m:
         sys.exit("no <version> in metadata.xml")
     version = m.group(1).strip()
+    # src/s411_version.h is the single source; the metadata must agree
+    hdr = open(os.path.join(ROOT, "src", "s411_version.h"), encoding="utf-8").read()
+    hv = re.search(r'#define S411_VERSION_STRING "([^"]+)"', hdr)
+    if not hv or hv.group(1) != version:
+        sys.exit("version mismatch: src/s411_version.h says %s, metadata.xml says %s"
+                 % (hv.group(1) if hv else "?", version))
+    if ("/v%s/" % version) not in meta or ("-%s-" % version) not in meta:
+        sys.exit("metadata.xml tarball-url does not point at release v%s" % version)
 
     top = "s411_pi-%s" % version
     dist = os.path.join(ROOT, "dist")

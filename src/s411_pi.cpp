@@ -414,7 +414,8 @@ private:
 class S411CtrlDialog : public wxDialog {
 public:
   S411CtrlDialog(wxWindow *parent, s411_pi *pi)
-      : wxDialog(parent, wxID_ANY, "S-411 Ice Information", wxDefaultPosition,
+      : wxDialog(parent, wxID_ANY, "S-411 Ice Information  v" S411_VERSION_STRING,
+                 wxDefaultPosition,
                  wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
         m_pi(pi) {
     auto *s = new wxBoxSizer(wxVERTICAL);
@@ -865,7 +866,7 @@ extern "C" DECL_EXP opencpn_plugin *create_pi(void *ppimgr) {
 }
 extern "C" DECL_EXP void destroy_pi(opencpn_plugin *p) { delete p; }
 
-s411_pi::s411_pi(void *ppimgr) : opencpn_plugin_116(ppimgr) { MakeIcon(); }
+s411_pi::s411_pi(void *ppimgr) : opencpn_plugin_117(ppimgr) { MakeIcon(); }
 
 // ---------------------------------------------------------------------------
 // identification
@@ -885,7 +886,8 @@ wxString s411_pi::GetLongDescription() {
          "day/dusk/night palette, matching the S-411 web viewer.\n"
          "Shows the age of the ice information, applies the dataset\n"
          "precedence rules, verifies S-100 signatures, draws the Annex C\n"
-         "symbols, checks routes for ice and downloads current charts.";
+         "symbols, checks routes for ice and downloads current charts.\n"
+         "Version " S411_VERSION_STRING;
 }
 
 void s411_pi::MakeIcon() {

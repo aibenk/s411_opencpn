@@ -3,7 +3,7 @@
   <version>0.8.1</version>
   <release>1</release>
   <summary>S-411 Ice Information overlay (IHO S-100 ice charts)</summary>
-  <api-version>1.16</api-version>
+  <api-version>1.17</api-version>
   <open-source>true</open-source>
   <author>s411_pi authors</author>
   <source>https://github.com/aibenk/s411_opencpn</source>
